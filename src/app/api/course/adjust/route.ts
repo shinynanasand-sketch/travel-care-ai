@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         if (t?.trim()) tokens.add(t.trim());
       }
 
-      for (const token of tokens) {
+      for (const token of Array.from(tokens)) {
         const result = await sendGuardianNotification(
           token,
           '건강 경고 알림',

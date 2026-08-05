@@ -130,7 +130,7 @@ export async function generateOptimizedCourse(
     { detail: RestaurantDetail | null; analysis: MenuAnalysis }
   >();
   await runWithConcurrency(
-    [...usedRestaurants.values()].map((r) => async () => {
+    Array.from(usedRestaurants.values()).map((r) => async () => {
       const detail = await getRestaurantDetail(r.contentid);
       const analysis = await analyzeMenuForHealth({
         firstmenu: detail?.firstmenu ?? r.title,
@@ -144,7 +144,7 @@ export async function generateOptimizedCourse(
 
   const accessibilityMap = new Map<string, AccessibilityInfo | undefined>();
   await runWithConcurrency(
-    [...usedAttractions.values()].map((a) => async () => {
+    Array.from(usedAttractions.values()).map((a) => async () => {
       try {
         accessibilityMap.set(
           a.contentid,
