@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String
+  phone         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  healthProfile HealthProfile?
+  travelPlans   TravelPlan[]
+  healthRecords HealthRecord[]
+  guardians     Guardian[]
+}
+
+model HealthProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  conditions          String[]
+  medications         String[]
+  activityLevel       String
+  insulinUser         Boolean  @default(false)
+  restrictions        String[]
+  targetBSMin         Int      @default(70)
+  targetBSMax         Int      @default(180)
+  targetBloodPressure String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model TravelPlan {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  destination   String
+  areaCode      String
+  startDate     DateTime
+  endDate       DateTime
+  status        String         @default("PLANNED")
+  courseData    Json
+  safetyScore   Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  healthRecords HealthRecord[]
+}
+
+model HealthRecord {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  travelPlanId String?
+  travelPlan   TravelPlan? @relation(fields: [travelPlanId], references: [id])
+  recordType   String
+  value        Float
+  value2       Float?
+  alertLevel   String?
+  location     Json?
+  recordedAt   DateTime    @default(now())
+}
+
+model Guardian {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  name         String
+  phone        String
+  relationship String
+  fcmToken     String?
+  notifyLevel  String   @default("WARNING")
+  createdAt    DateTime @default(now())
+}
+
+model ApiCache {
+  id        String   @id @default(cuid())
+  cacheKey  String   @unique
+  data      Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

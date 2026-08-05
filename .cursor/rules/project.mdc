@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+
+# 여행 속 주치의 + 비건 확장 — Cursor 전역 규칙
+
+## 프로젝트
+- Next.js 14 App Router + TypeScript + Tailwind CSS
+- 2026 관광데이터 활용 공모전 ②-2 웹·앱 구현 부문
+- AI: Google Gemini 2.0 Flash
+
+## 절대 규칙
+1. 의료 진단·처방 기능 금지 → 반드시 "참고용" 문구 표시
+2. 관광 정보는 반드시 TourAPI 경유
+3. API 호출 전 Redis 캐시 확인
+4. 혈당 70 미만 → 즉각 보호자 FCM 알림
+5. 건강 데이터 외부 전송 금지
+
+## 비건 관련 규칙
+6. ConditionType에 VEGAN/VEGETARIAN/HALAL/FOOD_ALLERGY 포함
+7. 비건 조건 시 searchKeyword1 '비건','채식' 검색 결과 우선 배치
+8. menuAnalyzer 응답에 veganFriendly, veganItems, nonVeganIngredients 포함
+9. VeganLevel: FULL_VEGAN / PARTIAL_VEGAN / CHECK_NEEDED / NOT_VEGAN
