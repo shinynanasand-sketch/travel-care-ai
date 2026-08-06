@@ -15,7 +15,7 @@
 | Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | 없으면 캐시 스킵 |
 | DB (선택) | `DATABASE_URL`, `DIRECT_URL` | Supabase Postgres. mock-only 배포 시 placeholder URL이면 충분 |
 | FCM (선택) | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | 보호자 실알림 |
-| Mock | `USE_MOCK_DATA` | 1단계 배포는 `"true"`, 실연동 시 `"false"` |
+| Mock | `USE_MOCK_DATA` | Production은 `"false"` + `PUBLIC_DATA_API_KEY` / `GEMINI_API_KEY` (실연동) |
 
 ## 1. GitHub
 

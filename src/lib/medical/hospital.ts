@@ -5,7 +5,11 @@ import { buildCacheKey, CACHE_TTL } from '@/lib/cache/keys';
 import type { MedicalFacility } from '@/types/medical.types';
 
 const HIRA_BASE =
-  'http://apis.data.go.kr/B551182/MadmDtlInfoHospInfoService2';
+  'https://apis.data.go.kr/B551182/MadmDtlInfoHospInfoService2';
+
+function useMockMedical(): boolean {
+  return process.env.USE_MOCK_DATA === 'true' || !isHiraApiConfigured();
+}
 
 function isHiraApiConfigured(): boolean {
   return Boolean(process.env.PUBLIC_DATA_API_KEY?.trim());
@@ -35,7 +39,7 @@ async function fetchMedical(
   radius: number,
   type: MedicalFacility['type']
 ): Promise<MedicalFacility[]> {
-  if (!isHiraApiConfigured()) {
+  if (useMockMedical()) {
     return getMockFacilities(lat, lng, type);
   }
 

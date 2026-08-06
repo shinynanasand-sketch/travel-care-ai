@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { MedicalFacility } from '@/types/medical.types';
 
 const NMC_BASE =
-  'http://apis.data.go.kr/B552657/ErmctInfoInqireService';
+  'https://apis.data.go.kr/B552657/ErmctInfoInqireService';
 
 interface EgytRaw {
   dutyName?: string;
