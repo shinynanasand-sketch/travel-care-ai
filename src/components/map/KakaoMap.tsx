@@ -18,12 +18,17 @@ interface KakaoMapProps {
 type KakaoMaps = {
   load: (cb: () => void) => void;
   LatLng: new (lat: number, lng: number) => unknown;
+  LatLngBounds: new () => {
+    extend: (latlng: unknown) => void;
+  };
   Map: new (
     el: HTMLElement,
     opts: { center: unknown; level: number }
   ) => {
     setCenter: (c: unknown) => void;
     relayout: () => void;
+    setBounds: (bounds: unknown) => void;
+    setLevel: (level: number) => void;
   };
   Marker: new (opts: { position: unknown; title?: string }) => {
     setMap: (map: unknown) => void;
@@ -89,9 +94,12 @@ function loadKakaoSdk(appKey: string): Promise<KakaoMaps> {
 
 export function KakaoMap({ center, markers = [], height = '300px' }: KakaoMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<{ setCenter: (c: unknown) => void; relayout: () => void } | null>(
-    null
-  );
+  const mapInstance = useRef<{
+    setCenter: (c: unknown) => void;
+    relayout: () => void;
+    setBounds: (bounds: unknown) => void;
+    setLevel: (level: number) => void;
+  } | null>(null);
   const markerObjs = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
   const key = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY?.trim();
   const [error, setError] = useState<string | null>(null);
@@ -120,12 +128,6 @@ export function KakaoMap({ center, markers = [], height = '300px' }: KakaoMapPro
           mapInstance.current.setCenter(pos);
         }
 
-        // 컨테이너가 늦게 레이아웃될 때 빈 지도 방지
-        requestAnimationFrame(() => {
-          mapInstance.current?.relayout();
-          mapInstance.current?.setCenter(pos);
-        });
-
         markerObjs.current.forEach((m) => m.setMap(null));
         markerObjs.current = markers.map((m) => {
           const marker = new maps.Marker({
@@ -134,6 +136,24 @@ export function KakaoMap({ center, markers = [], height = '300px' }: KakaoMapPro
           });
           marker.setMap(mapInstance.current);
           return marker;
+        });
+
+        if (markers.length >= 2 && maps.LatLngBounds) {
+          const bounds = new maps.LatLngBounds();
+          markers.forEach((m) => bounds.extend(new maps.LatLng(m.lat, m.lng)));
+          mapInstance.current.setBounds(bounds);
+        } else if (markers.length === 1) {
+          mapInstance.current.setCenter(new maps.LatLng(markers[0].lat, markers[0].lng));
+          mapInstance.current.setLevel(4);
+        }
+
+        requestAnimationFrame(() => {
+          mapInstance.current?.relayout();
+          if (markers.length >= 2 && maps.LatLngBounds) {
+            const bounds = new maps.LatLngBounds();
+            markers.forEach((m) => bounds.extend(new maps.LatLng(m.lat, m.lng)));
+            mapInstance.current?.setBounds(bounds);
+          }
         });
 
         setReady(true);

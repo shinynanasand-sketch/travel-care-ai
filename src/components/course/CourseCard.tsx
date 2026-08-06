@@ -35,11 +35,19 @@ function scheduleMarkers(schedules: Schedule[]) {
 }
 
 function NearbyMedicalBlock({ schedule }: { schedule: Schedule }) {
+  if (schedule.type === 'REST') return null;
   const items = (schedule.nearbyMedical ?? []).slice(0, 2);
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+        이 장소 좌표 기준 근처 의료시설을 찾지 못했습니다. (실시간은 「여행중 →
+        주변」에서 GPS로 확인)
+      </div>
+    );
+  }
   return (
     <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-gray-700">
-      <p className="mb-1 font-medium text-blue-900">이 장소 근처 의료</p>
+      <p className="mb-1 font-medium text-blue-900">이 장소 근처 의료 (일정 좌표 기준)</p>
       <ul className="space-y-1">
         {items.map((f, i) => (
           <li key={`${f.name}-${i}`}>

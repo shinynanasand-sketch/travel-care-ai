@@ -9,7 +9,7 @@ import {
 import { getMockRestaurants, getMockVeganRestaurants } from '@/lib/tourapi/mock-data';
 import { getAttractionsByArea } from '@/lib/tourapi/attraction';
 import { getWeather } from '@/lib/tourapi/weather';
-import { getNearbyHospitals, getNearbyPharmacies } from '@/lib/medical/hospital';
+import { getNearbyHospitals, getNearbyPharmacies, getMedicalNearSpot } from '@/lib/medical/hospital';
 import { getAccessibilityInfo } from '@/lib/tourapi/barrierFree';
 import { getWellnessCourse } from '@/lib/tourapi/wellness';
 import { analyzeMenuForHealth, veganLevelFromAnalysis } from './menuAnalyzer';
@@ -58,6 +58,42 @@ async function runWithConcurrency(
     }
   );
   await Promise.all(workers);
+}
+
+/** Fetch medical near each schedule coordinate (deduped by ~100m grid). */
+async function attachNearbyMedicalBySpot(days: DayCourse[]): Promise<void> {
+  const cache = new Map<string, MedicalFacility[]>();
+  const targets: Schedule[] = [];
+  for (const day of days) {
+    for (const s of day.schedules) {
+      if (
+        s.type === 'REST' ||
+        !Number.isFinite(s.coordinates?.lat) ||
+        !Number.isFinite(s.coordinates?.lng)
+      ) {
+        continue;
+      }
+      // Skip near-null coords from bad conversion
+      if (Math.abs(s.coordinates.lat) < 0.01 && Math.abs(s.coordinates.lng) < 0.01) {
+        continue;
+      }
+      targets.push(s);
+    }
+  }
+
+  await runWithConcurrency(
+    targets.map((s) => async () => {
+      const key = `${s.coordinates.lat.toFixed(3)},${s.coordinates.lng.toFixed(3)}`;
+      if (!cache.has(key)) {
+        cache.set(
+          key,
+          await getMedicalNearSpot(s.coordinates.lat, s.coordinates.lng, 3)
+        );
+      }
+      s.nearbyMedical = cache.get(key)!.slice(0, 2);
+    }),
+    3
+  );
 }
 
 export async function generateOptimizedCourse(
@@ -206,7 +242,7 @@ export async function generateOptimizedCourse(
         safetyReason: analysis.recommendation,
         healthTips: [analysis.postMealAdvice],
         menuAnalysis: analysis,
-        nearbyMedical: medicalFacilities.slice(0, 2),
+        nearbyMedical: [],
       });
     }
 
@@ -238,7 +274,7 @@ export async function generateOptimizedCourse(
         safetyLevel,
         safetyReason,
         healthTips,
-        nearbyMedical: medicalFacilities.slice(0, 1),
+        nearbyMedical: [],
         accessibility,
       });
     }
@@ -262,7 +298,7 @@ export async function generateOptimizedCourse(
         safetyLevel: 'GREEN',
         safetyReason: `${themeLabel} 웰니스 힐링 코스 — 심신 회복`,
         healthTips: ['무리하지 않는 선에서 휴식', '수분 섭취 유지'],
-        nearbyMedical: medicalFacilities.slice(0, 1),
+        nearbyMedical: [],
         wellnessTheme: wellness.theme,
       });
     }
@@ -282,6 +318,9 @@ export async function generateOptimizedCourse(
 
     days.push({ day: d + 1, date, schedules });
   }
+
+  // 일정(스팟) 좌표 기준 근처 의료 — GPS/여행지 중심 복붙이 아님
+  await attachNearbyMedicalBySpot(days);
 
   const safetyScores = days.flatMap((day) =>
     day.schedules.map((s) =>

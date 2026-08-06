@@ -34,10 +34,19 @@ export function parseTourResponse<T>(data: unknown): T[] {
   return Array.isArray(items) ? items : [items];
 }
 
+/** KorService1 often used fixed-point×1e7; KorService2 usually WGS84 degrees. */
+export function normalizeTourAxis(raw: string | number): number {
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).trim());
+  if (!Number.isFinite(n)) return 0;
+  // Degrees are within ±180 (lng) / ±90 (lat). Larger ⇒ fixed-point integer.
+  if (Math.abs(n) > 180) return n / 10_000_000;
+  return n;
+}
+
 export function tourCoords(mapx: string, mapy: string) {
   return {
-    lat: parseFloat(mapy) / 10000000,
-    lng: parseFloat(mapx) / 10000000,
+    lat: normalizeTourAxis(mapy),
+    lng: normalizeTourAxis(mapx),
   };
 }
 

@@ -61,20 +61,35 @@ async function fetchMedical(
     });
     const items = data?.response?.body?.items?.item ?? [];
     const list = (Array.isArray(items) ? items : items ? [items] : []).map(
-      (item: { yadmNm: string; addr: string; telno: string; XPos: string; YPos: string }) => ({
+      (item: {
+        yadmNm: string;
+        addr: string;
+        telno: string;
+        XPos: string;
+        YPos: string;
+      }) => ({
         name: item.yadmNm,
         type,
         address: item.addr,
         phone: item.telno,
-        coordinates: { lat: parseFloat(item.YPos), lng: parseFloat(item.XPos) },
-        distanceM: calcDistance(lat, lng, parseFloat(item.YPos), parseFloat(item.XPos)),
+        coordinates: {
+          lat: parseFloat(item.YPos),
+          lng: parseFloat(item.XPos),
+        },
+        distanceM: calcDistance(
+          lat,
+          lng,
+          parseFloat(item.YPos),
+          parseFloat(item.XPos)
+        ),
       })
     );
-    if (list.length === 0) return getMockFacilities(lat, lng, type);
+    // Live mode: empty / error → empty list (do not show Gwangju sample)
+    if (list.length === 0) return [];
     await setCache(cacheKey, list, CACHE_TTL.medical);
     return list;
   } catch {
-    return getMockFacilities(lat, lng, type);
+    return [];
   }
 }
 
@@ -94,6 +109,21 @@ export async function getNearbyPharmacies(
   return fetchMedical('getPharmacyBasisList', lat, lng, radius, 'PHARMACY');
 }
 
+/** Hospital + pharmacy near a spot (for course schedule cards). */
+export async function getMedicalNearSpot(
+  lat: number,
+  lng: number,
+  limit = 3
+): Promise<MedicalFacility[]> {
+  const [hospitals, pharmacies] = await Promise.all([
+    getNearbyHospitals(lat, lng, 1500),
+    getNearbyPharmacies(lat, lng, 1000),
+  ]);
+  return [...hospitals, ...pharmacies]
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, limit);
+}
+
 function getMockFacilities(
   lat: number,
   lng: number,
@@ -104,20 +134,21 @@ function getMockFacilities(
     PHARMACY: '24시 약국',
     EMERGENCY: '응급실',
   };
+  const areaHint = `위도 ${lat.toFixed(3)}, 경도 ${lng.toFixed(3)} 인근 (샘플)`;
   return [
     {
-      name: `가까운 ${labels[type]}`,
+      name: `[샘플] 인근 ${labels[type]}`,
       type,
-      address: '광주광역시 북구 운암동 (샘플 주소)',
-      phone: '062-123-4567',
+      address: areaHint,
+      phone: '전화 문의',
       coordinates: { lat: lat + 0.002, lng: lng + 0.002 },
       distanceM: 500,
     },
     {
-      name: `${labels[type]} (2호점)`,
+      name: `[샘플] ${labels[type]} B`,
       type,
-      address: '광주광역시 북구 동림동 (샘플 주소)',
-      phone: '062-234-5678',
+      address: areaHint,
+      phone: '전화 문의',
       coordinates: { lat: lat + 0.004, lng: lng + 0.003 },
       distanceM: 800,
     },
