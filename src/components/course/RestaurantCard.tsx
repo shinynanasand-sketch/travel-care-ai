@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface RestaurantCardProps {
   title: string;
+  address?: string;
   firstmenu?: string;
   safetyLevel: Schedule['safetyLevel'];
   veganLevel?: Schedule['veganLevel'];
@@ -16,6 +17,7 @@ interface RestaurantCardProps {
 
 export function RestaurantCard({
   title,
+  address,
   firstmenu,
   safetyLevel,
   veganLevel,
@@ -26,6 +28,7 @@ export function RestaurantCard({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">🍽️ {title}</CardTitle>
+        {address && <p className="text-xs text-gray-500">{address}</p>}
         {firstmenu && <p className="text-sm text-gray-600">대표: {firstmenu}</p>}
       </CardHeader>
       <CardContent className="space-y-2">

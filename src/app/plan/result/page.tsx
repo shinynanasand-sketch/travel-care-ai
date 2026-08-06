@@ -59,7 +59,19 @@ export default function PlanResultPage() {
         <h2 className="font-semibold">주변 의료시설</h2>
         {course.medicalFacilities.slice(0, 3).map((f) => (
           <div key={f.name} className="rounded-lg border p-3 text-sm">
-            {f.type === 'HOSPITAL' ? '🏥' : '💊'} {f.name} — {f.distanceM}m
+            <p className="font-medium">
+              {f.type === 'HOSPITAL' ? '🏥' : '💊'} {f.name}
+              {f.distanceM != null ? ` — ${f.distanceM}m` : ''}
+            </p>
+            {f.address ? <p className="text-xs text-gray-600">{f.address}</p> : null}
+            {f.phone ? (
+              <a
+                href={`tel:${f.phone.replace(/[^0-9+]/g, '')}`}
+                className="text-xs text-blue-700"
+              >
+                {f.phone}
+              </a>
+            ) : null}
           </div>
         ))}
       </div>
