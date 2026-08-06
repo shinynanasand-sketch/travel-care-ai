@@ -52,12 +52,39 @@ npx vercel env add USE_MOCK_DATA
 npx vercel --prod
 ```
 
-### Kakao JavaScript 키 도메인
+### Kakao Web 도메인 (필수 — 미등록 시 지도 401)
 
-배포 URL이 생기면 카카오 개발자 콘솔 → 앱 → 플랫폼 → Web:
+브라우저에서 스크립트를 불러올 때 Referer가 없으면 SDK는 200이지만,  
+`localhost` / `travel-care-ai.vercel.app` Referer면 **도메인 미등록 시 401** → 지도 로드 실패.
 
-- `https://<project>.vercel.app`
-- 커스텀 도메인이 있으면 그 도메인도 추가
+**반드시 `.env.local`의 JavaScript 키가 속한 그 앱**에서 등록:
+
+1. https://developers.kakao.com → **내 애플리케이션** → **앱 키**에서 `NEXT_PUBLIC_KAKAO_MAP_KEY`와 **같은 JavaScript 키**인지 확인  
+2. **JavaScript 키 → JavaScript SDK 도메인**에 추가·저장 (일반 「웹 도메인」과 별개):
+   - `http://localhost:3000`
+   - `https://travel-care-ai.vercel.app`
+3. 다른 카카오 앱·웹 도메인(링크용)만 등록되어 있으면 지도는 계속 401
+
+등록 후 1~2분 기다린 뒤 강력 새로고침. 키 값이 바뀌면 Vercel env 갱신 후 재배포 필요.
+
+### Kakao JavaScript 키 (로컬 → Vercel)
+
+`.env.local`의 `NEXT_PUBLIC_KAKAO_MAP_KEY`(및 선택 `KAKAO_REST_API_KEY`)는 Git에 올리지 않습니다.  
+배포 지도가 동작하려면 **같은 값을 Vercel Environment Variables에 복사한 뒤 재배포**해야 합니다 (`NEXT_PUBLIC_*`는 빌드 시 주입).
+
+```powershell
+cd C:\Users\gicon\Desktop\Tour\travel-care-ai
+# 값을 stdin으로 넣거나 대시보드에서 등록
+npx vercel env add NEXT_PUBLIC_KAKAO_MAP_KEY production
+npx vercel --prod
+```
+
+### Kakao Web 도메인
+
+카카오 개발자 콘솔 → 앱 → 플랫폼 → Web 사이트 도메인:
+
+- `http://localhost:3000`
+- `https://travel-care-ai.vercel.app` (또는 현재 Production URL)
 
 미등록 시 지도가 로컬에서만 되고 배포 환경에서 실패합니다.
 

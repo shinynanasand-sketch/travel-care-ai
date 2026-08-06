@@ -71,10 +71,10 @@ export default function TravelNearbyPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold">주변 시설</h1>
 
-      {geoLoading || fetching ? (
+      <KakaoMap center={center} markers={markers} height="250px" />
+
+      {(geoLoading || fetching) && (
         <p className="text-center text-sm text-gray-500">주변 시설 정보를 불러오는 중...</p>
-      ) : (
-        <KakaoMap center={center} markers={markers} height="250px" />
       )}
 
       {fetchError && (
@@ -92,6 +92,8 @@ export default function TravelNearbyPage() {
               name={h.name}
               type="HOSPITAL"
               distanceM={h.distanceM}
+              address={h.address}
+              phone={h.phone}
             />
           ))
         ) : (
@@ -108,6 +110,8 @@ export default function TravelNearbyPage() {
               name={p.name}
               type="PHARMACY"
               distanceM={p.distanceM}
+              address={p.address}
+              phone={p.phone}
             />
           ))
         ) : (
