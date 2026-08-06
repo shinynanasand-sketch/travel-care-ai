@@ -7,7 +7,7 @@ import type { MedicalFacility } from '@/types/medical.types';
 const HIRA_BASE =
   'https://apis.data.go.kr/B551182/MadmDtlInfoHospInfoService2';
 
-function useMockMedical(): boolean {
+function shouldUseMockMedical(): boolean {
   return process.env.USE_MOCK_DATA === 'true' || !isHiraApiConfigured();
 }
 
@@ -39,7 +39,7 @@ async function fetchMedical(
   radius: number,
   type: MedicalFacility['type']
 ): Promise<MedicalFacility[]> {
-  if (useMockMedical()) {
+  if (shouldUseMockMedical()) {
     return getMockFacilities(lat, lng, type);
   }
 
