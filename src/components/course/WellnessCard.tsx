@@ -1,11 +1,14 @@
 'use client';
 
+import { PlaceThumbnail } from '@/components/course/PlaceThumbnail';
 import type { WellnessTheme } from '@/types/tourapi.types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface WellnessCardProps {
   title: string;
   address: string;
+  hookLine?: string;
+  imageUrl?: string;
   safetyReason: string;
   healthTips?: string[];
   theme?: WellnessTheme;
@@ -23,6 +26,8 @@ const THEME_META: Record<WellnessTheme, { icon: string; label: string }> = {
 export function WellnessCard({
   title,
   address,
+  hookLine,
+  imageUrl,
   safetyReason,
   healthTips,
   theme,
@@ -30,7 +35,13 @@ export function WellnessCard({
   const meta = theme ? THEME_META[theme] : { icon: '🌿', label: '웰니스' };
 
   return (
-    <Card className="border-teal-200 bg-teal-50/40">
+    <Card className="overflow-hidden border-teal-200 bg-teal-50/40 shadow-sm">
+      <PlaceThumbnail
+        src={imageUrl}
+        alt={title}
+        kind="WELLNESS"
+        className="h-44 w-full rounded-none rounded-t-lg"
+      />
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">
@@ -40,10 +51,14 @@ export function WellnessCard({
             {meta.label}
           </span>
         </div>
+        {hookLine ? (
+          <p className="text-sm text-teal-900">{hookLine}</p>
+        ) : (
+          <p className="text-sm text-teal-800">🌿 {safetyReason}</p>
+        )}
         <p className="text-sm text-gray-600">{address}</p>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-sm text-teal-800">🌿 {safetyReason}</p>
         {healthTips && healthTips.length > 0 && (
           <ul className="text-xs text-gray-600">
             {healthTips.map((tip) => (

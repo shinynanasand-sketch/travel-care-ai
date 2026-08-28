@@ -26,6 +26,11 @@ function toCoords(lat: number, lng: number, offset = 0) {
   };
 }
 
+/** Mock 썸네일 — 시연·로컬 UI용 (picsum 고정 시드) */
+function mockImageUrl(contentId: string): string {
+  return `https://picsum.photos/seed/${encodeURIComponent(contentId)}/400/280`;
+}
+
 export function getMockRestaurants(
   areaCode: string,
   lat: number,
@@ -41,6 +46,7 @@ export function getMockRestaurants(
       contentid: `mock-r-${areaCode}-1`,
       title: `${region.shortName} 건강한 한식당`,
       addr1: `${region.name} 중심가`,
+      firstimage: mockImageUrl(`mock-r-${areaCode}-1`),
       ...coords0,
       dist: '200',
     },
@@ -48,6 +54,7 @@ export function getMockRestaurants(
       contentid: `mock-r-${areaCode}-2`,
       title: `${region.shortName} 담백한 백반집`,
       addr1: `${region.name} 전통시장 인근`,
+      firstimage: mockImageUrl(`mock-r-${areaCode}-2`),
       ...coords1,
       dist: '450',
     },
@@ -55,6 +62,7 @@ export function getMockRestaurants(
       contentid: `mock-r-${areaCode}-3`,
       title: `${region.shortName} 현미죽 전문점`,
       addr1: `${region.name} 역세권`,
+      firstimage: mockImageUrl(`mock-r-${areaCode}-3`),
       ...coords2,
       dist: '680',
     },
@@ -77,6 +85,7 @@ export function getMockVeganRestaurants(
       contentid: `mock-v-${areaCode}-1`,
       title: `${region.shortName} 그린키친 비건 레스토랑`,
       addr1: `${region.name} 비건거리`,
+      firstimage: mockImageUrl(`mock-v-${areaCode}-1`),
       ...coords0,
       dist: '150',
       veganScore: 10,
@@ -86,6 +95,7 @@ export function getMockVeganRestaurants(
       contentid: `mock-v-${areaCode}-2`,
       title: `${region.shortName} 채식카페`,
       addr1: `${region.name} 문화거리`,
+      firstimage: mockImageUrl(`mock-v-${areaCode}-2`),
       ...coords1,
       dist: '320',
       veganScore: 9,
@@ -95,6 +105,7 @@ export function getMockVeganRestaurants(
       contentid: `mock-v-${areaCode}-3`,
       title: `${region.shortName} 사찰음식 정식`,
       addr1: `${region.name} 전통거리`,
+      firstimage: mockImageUrl(`mock-v-${areaCode}-3`),
       ...coords2,
       dist: '540',
       veganScore: 7,
@@ -113,10 +124,12 @@ export function getMockAttractions(areaCode: string): AttractionItem[] {
 
   return attractions.map((a, i) => {
     const coords = toCoords(region.lat, region.lng, i * 0.012);
+    const contentid = `mock-a-${areaCode}-${i + 1}`;
     return {
-      contentid: `mock-a-${areaCode}-${i + 1}`,
+      contentid,
       title: a.title,
       addr1: a.addr,
+      firstimage: mockImageUrl(contentid),
       mapx: coords.mapx,
       mapy: coords.mapy,
     };

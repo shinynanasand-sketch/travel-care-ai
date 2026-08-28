@@ -1,4 +1,6 @@
-import { getNearbyHospitals } from '@/lib/medical/hospital';
+import {
+  getNearbyHospitalsWithMeta,
+} from '@/lib/medical/hospital';
 import { errorResponse } from '@/lib/utils/api-error';
 
 export async function GET(request: Request) {
@@ -7,8 +9,8 @@ export async function GET(request: Request) {
     const lat = parseFloat(searchParams.get('lat') ?? '37.5665');
     const lng = parseFloat(searchParams.get('lng') ?? '126.978');
     const radius = parseInt(searchParams.get('radius') ?? '3000', 10);
-    const hospitals = await getNearbyHospitals(lat, lng, radius);
-    return Response.json({ hospitals });
+    const { facilities, meta } = await getNearbyHospitalsWithMeta(lat, lng, radius);
+    return Response.json({ hospitals: facilities, meta });
   } catch (error) {
     return errorResponse(error);
   }

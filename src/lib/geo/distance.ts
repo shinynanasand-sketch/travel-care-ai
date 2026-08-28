@@ -26,6 +26,30 @@ export function estimateWalkMinutes(meters: number): number {
   return Math.max(1, Math.round(meters / 75));
 }
 
+/** Rough urban drive time (~25 km/h). */
+export function estimateDriveMinutes(meters: number): number {
+  if (!Number.isFinite(meters) || meters <= 0) return 0;
+  return Math.max(1, Math.round(meters / 420));
+}
+
+/**
+ * Travel hint by distance — do not suggest long walks for chronic-care travelers.
+ * ≤1.2km: walk · ≤4km: car/transit · farther: vehicle/transit recommended
+ */
+export function formatTravelHint(meters: number): string {
+  const dist = formatDistanceM(meters);
+  if (!Number.isFinite(meters) || meters <= 0) {
+    return `다음까지 직선 약 ${dist}`;
+  }
+  if (meters <= 1200) {
+    return `다음까지 직선 약 ${dist} · 도보 약 ${estimateWalkMinutes(meters)}분(추정)`;
+  }
+  if (meters <= 4000) {
+    return `다음까지 직선 약 ${dist} · 차로 약 ${estimateDriveMinutes(meters)}분 · 대중교통 가능(추정)`;
+  }
+  return `다음까지 직선 약 ${dist} · 차량·대중교통 권장 · 차로 약 ${estimateDriveMinutes(meters)}분(추정)`;
+}
+
 export function isValidCoord(c?: { lat: number; lng: number } | null): boolean {
   if (!c) return false;
   return (

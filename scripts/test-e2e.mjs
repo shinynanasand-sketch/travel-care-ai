@@ -151,15 +151,18 @@ async function stageC() {
         insulinUser: false,
         restrictions: [],
       },
+      travelStyle: '문화·역사',
     });
     const days = d.days || [];
     const med = d.medicalFacilities || [];
     const ok = days.length > 0;
+    const withImage = days.flatMap((day) => day.schedules || []).filter((s) => s.imageUrl).length;
+    const altCount = (d.alternatives || []).length;
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     record(
       'course/generate',
       ok,
-      `days=${days.length}, medical=${med.length}, safety=${d.overallSafetyScore ?? '-'}, vegan=${d.hasVeganOptions}, 소요=${elapsed}s`
+      `days=${days.length}, images=${withImage}, alternatives=${altCount}, safety=${d.overallSafetyScore ?? '-'}, 소요=${elapsed}s`
     );
   } catch (e) {
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);

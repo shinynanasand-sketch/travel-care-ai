@@ -1,6 +1,5 @@
 // 인증키: PUBLIC_DATA_API_KEY (getCommonParams 경유)
-import axios from 'axios';
-import { getCommonParams, parseTourResponse } from './client';
+import { parseTourResponse, tourApiFetch } from './client';
 import { isTourApiConfigured } from '@/lib/data/korea-regions';
 import { getCached, setCache } from '@/lib/cache/redis';
 import { buildCacheKey, CACHE_TTL } from '@/lib/cache/keys';
@@ -8,11 +7,6 @@ import type { AccessibilityInfo, AccessibilityLevel } from '@/types/tourapi.type
 
 // 무장애 여행 정보 — 한국관광공사 KorWithService2
 const BARRIER_FREE_BASE = 'https://apis.data.go.kr/B551011/KorWithService2';
-
-const barrierFreeClient = axios.create({
-  baseURL: BARRIER_FREE_BASE,
-  timeout: 15000,
-});
 
 interface DetailWithTourRaw {
   contentid?: string;
@@ -67,13 +61,14 @@ export async function getAccessibilityInfo(
   if (cached) return cached;
 
   try {
-    const { data } = await barrierFreeClient.get('/detailWithTour2', {
-      params: {
-        ...getCommonParams(),
+    const data = await tourApiFetch(
+      '/detailWithTour2',
+      {
         contentId,
         contentTypeId,
       },
-    });
+      { baseUrl: BARRIER_FREE_BASE }
+    );
     const items = parseTourResponse<DetailWithTourRaw>(data);
     const raw = items[0];
     if (!raw) return getMockAccessibility(contentId);

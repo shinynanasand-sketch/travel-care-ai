@@ -10,7 +10,7 @@ const config: Record<SafetyLevel, { emoji: string; label: string; color: string 
 
 interface HealthLightProps {
   level: SafetyLevel;
-  reason: string;
+  reason?: string;
 }
 
 export function HealthLight({ level, reason }: HealthLightProps) {
@@ -19,7 +19,7 @@ export function HealthLight({ level, reason }: HealthLightProps) {
     <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${color}`}>
       <span>{emoji}</span>
       <span className="font-medium">{label}</span>
-      <span className="text-xs opacity-80">{reason}</span>
+      {reason ? <span className="text-xs opacity-80">{reason}</span> : null}
     </div>
   );
 }

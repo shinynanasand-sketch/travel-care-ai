@@ -8,8 +8,13 @@ export interface TourApiItem {
   mapy: string;
   dist?: string;
   firstimage?: string;
+  firstimage2?: string;
   tel?: string;
   cat3?: string;
+  /** KorService2 신분류체계 (cat3 대체) */
+  lclsSystm1?: string;
+  lclsSystm2?: string;
+  lclsSystm3?: string;
   veganScore?: number;
   veganLevel?: VeganLevel;
 }

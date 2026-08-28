@@ -9,7 +9,12 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "test:keys": "node scripts/test-keys.mjs",
+    "test:e2e": "node scripts/test-e2e.mjs",
+    "test:kakao": "node scripts/test-kakao-map.mjs",
+    "test:rehearsal": "node scripts/rehearsal-live.mjs",
+    "test:demo-preflight": "node scripts/demo-preflight.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

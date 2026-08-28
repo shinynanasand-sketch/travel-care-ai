@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { HealthLight } from '@/components/health/HealthLight';
+import { PlaceThumbnail } from '@/components/course/PlaceThumbnail';
 import type { Schedule } from '@/types/course.types';
 import type { AccessibilityInfo, AccessibilityLevel } from '@/types/tourapi.types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 interface AttractionCardProps {
   title: string;
   address: string;
+  hookLine?: string;
+  imageUrl?: string;
   safetyLevel: Schedule['safetyLevel'];
   safetyReason: string;
   healthTips?: string[];
@@ -33,11 +37,14 @@ function isAvailable(value?: string): boolean {
 export function AttractionCard({
   title,
   address,
+  hookLine,
+  imageUrl,
   safetyLevel,
   safetyReason,
   healthTips,
   accessibility,
 }: AttractionCardProps) {
+  const [careOpen, setCareOpen] = useState(false);
   const features: Array<{ icon: string; label: string; value?: string }> = [
     { icon: '♿', label: '휠체어', value: accessibility?.wheelchair },
     { icon: '🚪', label: '무단차 출입구', value: accessibility?.exit },
@@ -51,41 +58,67 @@ export function AttractionCard({
   const availableFeatures = features.filter((f) => isAvailable(f.value));
 
   return (
-    <Card>
+    <Card className="overflow-hidden border-gray-200 shadow-sm">
+      <PlaceThumbnail
+        src={imageUrl}
+        alt={title}
+        kind="ATTRACTION"
+        className="h-44 w-full rounded-none rounded-t-lg"
+      />
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base">🏛️ {title}</CardTitle>
-          {accessibility?.level && (
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${LEVEL_STYLE[accessibility.level].className}`}
-            >
-              {LEVEL_STYLE[accessibility.level].label}
-            </span>
-          )}
-        </div>
+        <CardTitle className="text-base">🏛️ {title}</CardTitle>
+        {hookLine && <p className="text-sm font-medium text-teal-900">{hookLine}</p>}
         <p className="text-sm text-gray-600">{address}</p>
       </CardHeader>
       <CardContent className="space-y-2">
-        <HealthLight level={safetyLevel} reason={safetyReason} />
-        {availableFeatures.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {availableFeatures.map((f) => (
+        {safetyLevel === 'RED' || safetyLevel === 'YELLOW' ? (
+          <HealthLight level={safetyLevel} reason={safetyReason} />
+        ) : null}
+
+        <button
+          type="button"
+          className="text-xs text-gray-500 underline-offset-2 hover:underline"
+          onClick={() => setCareOpen((v) => !v)}
+        >
+          {careOpen ? '안심·무장애 정보 접기' : '안심·무장애 정보'}
+        </button>
+
+        {careOpen && (
+          <div className="space-y-2 rounded-md border border-gray-100 bg-gray-50 p-2">
+            {accessibility?.level && (
               <span
-                key={f.label}
-                className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
-                title={f.value}
+                className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${LEVEL_STYLE[accessibility.level].className}`}
               >
-                {f.icon} {f.label}
+                {LEVEL_STYLE[accessibility.level].label}
               </span>
-            ))}
+            )}
+            {safetyLevel === 'GREEN' && (
+              <HealthLight level={safetyLevel} reason={safetyReason} />
+            )}
+            {availableFeatures.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {availableFeatures.map((f) => (
+                  <span
+                    key={f.label}
+                    className="rounded-md bg-white px-2 py-0.5 text-xs text-gray-700"
+                    title={f.value}
+                  >
+                    {f.icon} {f.label}
+                  </span>
+                ))}
+              </div>
+            )}
+            {healthTips && healthTips.length > 0 && (
+              <ul className="text-xs text-gray-600">
+                {healthTips.map((tip) => (
+                  <li key={tip}>• {tip}</li>
+                ))}
+              </ul>
+            )}
+            {!accessibility && (
+              <p className="text-xs text-gray-500">{safetyReason}</p>
+            )}
           </div>
-        )}
-        {healthTips && healthTips.length > 0 && (
-          <ul className="text-xs text-gray-600">
-            {healthTips.map((tip) => (
-              <li key={tip}>• {tip}</li>
-            ))}
-          </ul>
         )}
       </CardContent>
     </Card>

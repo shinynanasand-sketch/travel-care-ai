@@ -14,9 +14,17 @@ function getRedis(): Redis | null {
   return redis;
 }
 
+function isDatabaseConfigured(): boolean {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) return false;
+  // .env.example placeholder — Prisma connect can hang indefinitely in dev
+  if (/USER:PASS@HOST/i.test(url)) return false;
+  return true;
+}
+
 function getPrisma(): PrismaClient | null {
   if (prisma) return prisma;
-  if (!process.env.DATABASE_URL) return null;
+  if (!isDatabaseConfigured()) return null;
   prisma = new PrismaClient();
   return prisma;
 }

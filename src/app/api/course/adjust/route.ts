@@ -1,5 +1,6 @@
 import { assessBloodSugar, shouldNotifyGuardian } from '@/lib/ai/healthAdvisor';
 import { getNearbyPharmacies } from '@/lib/medical/hospital';
+import { tourCoords } from '@/lib/tourapi/client';
 import { getVeganRestaurants } from '@/lib/tourapi/restaurant';
 import { sendGuardianNotification } from '@/lib/notification/firebase';
 import { db } from '@/lib/db';
@@ -65,20 +66,20 @@ export async function POST(request: Request) {
     if (body.currentLocation && assessment.level !== 'NORMAL') {
       const { lat, lng } = body.currentLocation;
       const [pharmacies, veganRestaurants] = await Promise.all([
-        getNearbyPharmacies(lat, lng, 500),
+        getNearbyPharmacies(lat, lng, 2000),
         isVegan ? getVeganRestaurants(lat, lng) : Promise.resolve([]),
       ]);
-      nearbyFacilities = [...pharmacies, ...veganRestaurants.map((r) => ({
-        name: r.title,
-        type: 'PHARMACY' as const,
-        address: r.addr1,
-        phone: r.tel ?? '',
-        coordinates: {
-          lat: parseFloat(r.mapy) / 10000000,
-          lng: parseFloat(r.mapx) / 10000000,
-        },
-        distanceM: parseInt(r.dist ?? '0', 10),
-      }))];
+      nearbyFacilities = [
+        ...pharmacies,
+        ...veganRestaurants.map((r) => ({
+          name: r.title,
+          type: 'PHARMACY' as const,
+          address: r.addr1,
+          phone: r.tel ?? '',
+          coordinates: tourCoords(r.mapx, r.mapy),
+          distanceM: parseInt(r.dist ?? '0', 10),
+        })),
+      ];
     }
 
     return Response.json({

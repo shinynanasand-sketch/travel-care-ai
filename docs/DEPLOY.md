@@ -9,9 +9,10 @@
 | GitHub 저장소 | — | https://github.com/shinynanasand-sketch/travel-care-ai (앱이 저장소 루트) |
 | Vercel 프로젝트 | — | Framework: Next.js, **Root Directory: `.`** |
 | Gemini | `GEMINI_API_KEY` | aistudio.google.com |
-| TourAPI/공공데이터 | `PUBLIC_DATA_API_KEY` | Decoding 키 |
+| TourAPI/공공데이터 | `PUBLIC_DATA_API_KEY` | Decoding 키 권장. HIRA는 `hospInfoServicev2`·`pharmacyInfoService` 각각 활용신청 |
 | Kakao Map | `NEXT_PUBLIC_KAKAO_MAP_KEY` | 도메인에 Vercel URL 등록 필수 |
-| Kakao REST | `KAKAO_REST_API_KEY` | 선택 |
+| Kakao REST | `KAKAO_REST_API_KEY` | **권장** — HIRA 실패·빈결과 시 병원(HP8)·약국(PM9) 폴백 |
+| 의료 진단 UI | `NEXT_PUBLIC_SHOW_MEDICAL_DIAGNOSTICS` | 개발 중 `true` → HIRA 실패 배너 표시 |
 | Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | 없으면 캐시 스킵 |
 | DB (선택) | `DATABASE_URL`, `DIRECT_URL` | Supabase Postgres. mock-only 배포 시 placeholder URL이면 충분 |
 | FCM (선택) | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | 보호자 실알림 |

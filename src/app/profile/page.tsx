@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DietSelector } from '@/components/health/DietSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUserProfileStore } from '@/store/userProfileStore';
+import {
+  loadUserProfileFromStorage,
+  saveUserProfileToStorage,
+} from '@/lib/profile/localProfile';
 import type { ConditionType, ActivityLevel } from '@/types/health.types';
 
 export default function ProfilePage() {
@@ -24,7 +28,30 @@ export default function ProfilePage() {
     healthProfile?.restrictions.join(', ') ?? ''
   );
 
-  const handleSave = () => {
+  // localStorage에 저장된 임시 프로필이 있으면 당뇨·비건 등 선택 상태 복원
+  useEffect(() => {
+    const saved = loadUserProfileFromStorage();
+    if (!saved || healthProfile?.conditions.length) return;
+
+    const restored: ConditionType[] = [];
+    if (saved.condition === 'diabetes') restored.push('DIABETES_TYPE2');
+    if (saved.condition === 'hypertension') restored.push('HYPERTENSION');
+    if (saved.condition === 'heart_disease') restored.push('HEART_DISEASE');
+    if (saved.diet === 'vegan') restored.push('VEGAN');
+    if (saved.diet === 'vegetarian') restored.push('VEGETARIAN');
+    if (saved.diet === 'pescatarian') restored.push('PESCATARIAN');
+    if (saved.diet === 'halal') restored.push('HALAL');
+    if (saved.diet === 'food_allergy') restored.push('FOOD_ALLERGY');
+    if (restored.length > 0) setConditions(restored);
+  }, [healthProfile?.conditions.length]);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    // DB 없이 localStorage에 { condition: 'diabetes', diet: 'vegan' } 형태로 임시 저장
+    saveUserProfileToStorage(conditions);
+
+    // /plan 코스 생성에 필요한 상세 프로필은 메모리(zustand)에만 동기화
     setName(userName);
     setHealthProfile({
       conditions,
@@ -36,11 +63,12 @@ export default function ProfilePage() {
         .map((r) => r.trim())
         .filter(Boolean),
     });
+
     router.push('/plan');
   };
 
   return (
-    <div className="space-y-6">
+    <form className="space-y-6" onSubmit={handleSubmit}>
       <h1 className="text-xl font-bold">건강·식이 프로필</h1>
 
       <Card>
@@ -107,13 +135,13 @@ export default function ProfilePage() {
       </Card>
 
       <Button
+        type="submit"
         className="w-full"
         size="lg"
-        onClick={handleSave}
         disabled={conditions.length === 0}
       >
-        저장하고 여행 계획하기
+        시작하기
       </Button>
-    </div>
+    </form>
   );
 }

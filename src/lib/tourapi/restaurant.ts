@@ -12,12 +12,14 @@ import {
   isMockContentId,
 } from './mock-data';
 import { isTourApiConfigured } from '@/lib/data/korea-regions';
+import { categoryLabel, tourAreaFilterParams } from '@/lib/data/korea-ldong';
 import { getCached, setCache } from '@/lib/cache/redis';
 import { buildCacheKey, CACHE_TTL } from '@/lib/cache/keys';
 import {
   quickVeganScore,
   isObviousMeatOnly,
   analyzeMenuForHealth,
+  sanitizeVeganAnalysis,
   veganLevelFromAnalysis,
   type VeganScoreItem,
 } from '@/lib/ai/menuAnalyzer';
@@ -30,6 +32,14 @@ const WIDE_RADIUS = 20000;
 const WIDE_ROWS = 1000;
 const STEP3_TOP = 50;
 const STEP3_CONCURRENCY = 10;
+
+function scoreCatInput(r: TourApiItem): VeganScoreItem {
+  return {
+    contentid: r.contentid,
+    title: r.title,
+    cat3: categoryLabel(r),
+  };
+}
 
 export async function getRestaurantsByLocation(
   lat: number,
@@ -99,7 +109,7 @@ async function veganStep1Keyword(
             ...getCommonParams(),
             keyword,
             contentTypeId: 39,
-            areaCode,
+            ...tourAreaFilterParams(areaCode),
             mapX: lng,
             mapY: lat,
             radius: WIDE_RADIUS,
@@ -132,15 +142,11 @@ async function veganStep2Scored(
     WIDE_ROWS
   );
   const candidates = wide.filter(
-    (r) => !isObviousMeatOnly({ contentid: r.contentid, title: r.title, cat3: r.cat3 })
+    (r) => !isObviousMeatOnly(scoreCatInput(r))
   );
   if (candidates.length === 0) return [];
 
-  const scoreInput: VeganScoreItem[] = candidates.map((r) => ({
-    contentid: r.contentid,
-    title: r.title,
-    cat3: r.cat3,
-  }));
+  const scoreInput: VeganScoreItem[] = candidates.map(scoreCatInput);
   const scores = await quickVeganScore(scoreInput);
 
   return candidates
@@ -157,11 +163,15 @@ async function veganStep3Detail(
   const analyzed = await mapChunked(candidates, STEP3_CONCURRENCY, async (r) => {
     try {
       const detail = await getRestaurantDetail(r.contentid);
-      const analysis = await analyzeMenuForHealth({
-        firstmenu: detail?.firstmenu ?? r.title,
-        treatmenu: detail?.treatmenu ?? '',
-        conditions: ['VEGAN'],
-      });
+      const menuBlob = `${detail?.firstmenu ?? r.title} ${detail?.treatmenu ?? ''} ${r.title}`;
+      const analysis = sanitizeVeganAnalysis(
+        menuBlob,
+        await analyzeMenuForHealth({
+          firstmenu: detail?.firstmenu ?? r.title,
+          treatmenu: detail?.treatmenu ?? '',
+          conditions: ['VEGAN'],
+        })
+      );
       const level = veganLevelFromAnalysis(analysis);
       return { ...r, veganLevel: level };
     } catch {

@@ -1,6 +1,5 @@
 // 인증키: PUBLIC_DATA_API_KEY (getCommonParams 경유)
-import axios from 'axios';
-import { getCommonParams, parseTourResponse } from './client';
+import { parseTourResponse, tourApiFetch } from './client';
 import { isTourApiConfigured } from '@/lib/data/korea-regions';
 import { getCached, setCache } from '@/lib/cache/redis';
 import { buildCacheKey, CACHE_TTL } from '@/lib/cache/keys';
@@ -8,11 +7,6 @@ import type { WellnessItem, WellnessTheme } from '@/types/tourapi.types';
 
 // 웰니스 관광정보 — 한국관광공사 WellnessTursmService (철자 "Tursm")
 const WELLNESS_BASE = 'https://apis.data.go.kr/B551011/WellnessTursmService';
-
-const wellnessClient = axios.create({
-  baseURL: WELLNESS_BASE,
-  timeout: 15000,
-});
 
 interface WellnessRaw {
   contentid: string;
@@ -84,9 +78,9 @@ export async function getWellnessCourse(
   if (cached && cached.length > 0) return cached;
 
   try {
-    const { data } = await wellnessClient.get('/locationBasedList', {
-      params: {
-        ...getCommonParams(),
+    const data = await tourApiFetch(
+      '/locationBasedList',
+      {
         langDivCd: 'KOR',
         mapX,
         mapY,
@@ -94,7 +88,8 @@ export async function getWellnessCourse(
         numOfRows,
         arrange: 'E',
       },
-    });
+      { baseUrl: WELLNESS_BASE }
+    );
     const raws = parseTourResponse<WellnessRaw>(data);
     if (raws.length === 0) return getMockWellness(lat, lng);
     const items = raws.map(toWellnessItem);
