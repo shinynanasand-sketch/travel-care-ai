@@ -28,11 +28,18 @@ export async function POST(request: Request) {
           alertLevel,
         },
       });
-      return Response.json({ record, alertLevel });
-    } catch {
+      return Response.json({ record, alertLevel, persisted: true });
+    } catch (dbError) {
+      console.error(
+        '[health/record] DB 저장 실패 — 데모 모드로 계속 진행합니다:',
+        dbError
+      );
       return Response.json({
         record: { ...body, alertLevel, recordedAt: new Date().toISOString() },
         alertLevel,
+        persisted: false,
+        dbError:
+          dbError instanceof Error ? dbError.message : 'database_unavailable',
       });
     }
   } catch (error) {

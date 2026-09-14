@@ -8,8 +8,9 @@ import {
   getRestaurantDetail,
 } from '@/lib/tourapi/restaurant';
 import { getMockRestaurants, getMockVeganRestaurants } from '@/lib/tourapi/mock-data';
-import { getAttractionsByArea, getAttractionsByLocation } from '@/lib/tourapi/attraction';
+import { getAttractionsByArea, getAttractionsByLocation, getCulturalFacilitiesByArea } from '@/lib/tourapi/attraction';
 import { deduplicateByContentId } from '@/lib/tourapi/client';
+import { isRestaurantBlacklisted } from '@/lib/tourapi/restaurantBlacklist';
 import { filterPlacesWithImages, pickTourImageUrl } from '@/lib/tourapi/placeFilters';
 import { getWeather } from '@/lib/tourapi/weather';
 import {
@@ -27,12 +28,14 @@ import {
   restaurantHookLine,
   scoreRestaurantNear,
   sortSchedulesByTime,
+  rankAttractions,
   themeForDay,
   themeLabel,
   travelStyleToDayTheme,
 } from './courseAppeal';
 import { planAttractionsByTravelStyle } from './courseStylePicker';
 import { distanceMeters } from '@/lib/geo/distance';
+import { getCourseProfileMode } from '@/lib/profile/healthConditions';
 import {
   analyzeMenuForHealth,
   sanitizeVeganAnalysis,
@@ -67,6 +70,19 @@ function riskToSafety(risk: string): SafetyLevel {
   if (risk === 'HIGH') return 'RED';
   if (risk === 'MEDIUM') return 'YELLOW';
   return 'GREEN';
+}
+
+function generalMenuAnalysis(restaurantTitle: string): MenuAnalysis {
+  return {
+    overallRisk: 'LOW',
+    veganFriendly: 'PARTIAL',
+    veganItems: [],
+    nonVeganIngredients: [],
+    menuItems: [],
+    recommendation: `${restaurantTitle} — 현지 인기 메뉴를 즐겨보세요.`,
+    alternatives: [],
+    postMealAdvice: '근처 카페·거리 산책으로 이어가기 좋습니다.',
+  };
 }
 
 async function runWithConcurrency(
@@ -185,6 +201,8 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   const cityWide = !sigunguCode;
   const coords = getDestinationCoords(destination.areaCode, sigunguCode);
   const isVegan = healthProfile.conditions.includes('VEGAN');
+  const profileMode = getCourseProfileMode(healthProfile.conditions);
+  const isHealthFocused = profileMode === 'health';
   const placeLabel = destination.name || region.name;
   // 시 전체(구 미지정): 초기 식당 풀을 넓게 — 일별 식사는 하이라이트 클러스터로 다시 좁힘
   const restaurantRadiusM =
@@ -197,13 +215,20 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     restaurantRadiusM,
     isVegan,
     travelStyle,
+    profileMode,
   });
+
+  const emptyMedicalResult = {
+    facilities: [] as MedicalFacility[],
+    meta: { source: 'mock' as const, hiraFailed: false, hiraMessage: '' },
+  };
 
   const [
     restaurants,
     veganRestaurants,
     areaAttractions,
     locationAttractions,
+    culturalFacilities,
     weather,
     hospitalResult,
     pharmacyResult,
@@ -225,15 +250,21 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
       cityWide && region.group === 'metropolitan' ? 12_000 : 8_000,
       destination.areaCode
     ),
+    getCulturalFacilitiesByArea(destination.areaCode, sigunguCode),
     getWeather(destination.areaCode),
-    getNearbyHospitalsWithMeta(coords.lat, coords.lng),
-    getNearbyPharmaciesWithMeta(coords.lat, coords.lng),
+    isHealthFocused
+      ? getNearbyHospitalsWithMeta(coords.lat, coords.lng)
+      : Promise.resolve(emptyMedicalResult),
+    isHealthFocused
+      ? getNearbyPharmaciesWithMeta(coords.lat, coords.lng)
+      : Promise.resolve(emptyMedicalResult),
     getWellnessCourse(coords.lat, coords.lng),
   ]);
 
   console.log('TourAPI 호출 완료', {
     restaurants: restaurants.length,
     attractions: areaAttractions.length + locationAttractions.length,
+    cultural: culturalFacilities.length,
     wellness: wellnessItems.length,
   });
 
@@ -269,6 +300,10 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     }
   }
 
+  const wellnessClosingPool = filterPlacesWithImages(
+    deduplicateByContentId([...scopedAttractions, ...culturalFacilities])
+  );
+
   const medicalFacilities: MedicalFacility[] = [
     ...hospitalResult.facilities,
     ...pharmacyResult.facilities,
@@ -298,6 +333,15 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   restaurantPool = filterPlacesWithImages(restaurantPool);
   console.log('식당 사진 필터', { count: restaurantPool.length });
 
+  let generalRestaurantPool: TourApiItem[] = filterPlacesWithImages(restaurants);
+  if (generalRestaurantPool.length === 0) {
+    generalRestaurantPool = getMockRestaurants(
+      destination.areaCode,
+      coords.lat,
+      coords.lng
+    );
+  }
+
   if (restaurantPool.length === 0) {
     restaurantPool = isVegan
       ? [
@@ -321,7 +365,8 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     coords,
     cityWide && region.group === 'metropolitan',
     dayClusterM,
-    destination.areaCode
+    destination.areaCode,
+    profileMode
   );
 
   const dayPlans: Array<{
@@ -348,7 +393,8 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
       highlight,
       isVegan,
       usedRestaurantIds,
-      mealMaxM
+      mealMaxM,
+      profileMode
     ).slice(0, 10);
 
     dayPlans.push({ theme, morning, afternoon, mealCandidates });
@@ -366,31 +412,64 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     string,
     { detail: RestaurantDetail | null; analysis: MenuAnalysis }
   >();
+  const blacklistedRestaurantIds = new Set<string>();
 
   console.log('Gemini 호출 시작...', {
     mealCandidates: toAnalyze.size,
     conditions: healthProfile.conditions,
+    profileMode,
+    skipMenuAnalysis: !isHealthFocused,
   });
 
-  await runWithConcurrency(
-    Array.from(toAnalyze.values()).map((r) => async () => {
-      const detail = await getRestaurantDetail(r.contentid);
-      const raw = await analyzeMenuForHealth({
-        firstmenu: detail?.firstmenu ?? r.title,
-        treatmenu: detail?.treatmenu ?? '',
-        conditions: healthProfile.conditions,
+  if (isHealthFocused) {
+    await runWithConcurrency(
+      Array.from(toAnalyze.values()).map((r) => async () => {
+        const detail = await getRestaurantDetail(r.contentid);
+
+        if (isRestaurantBlacklisted(r.title, detail?.treatmenu)) {
+          blacklistedRestaurantIds.add(r.contentid);
+          return;
+        }
+
+        const raw = await analyzeMenuForHealth({
+          firstmenu: detail?.firstmenu ?? r.title,
+          treatmenu: detail?.treatmenu ?? '',
+          conditions: healthProfile.conditions,
+        });
+        const analysis = sanitizeVeganAnalysis(
+          `${detail?.firstmenu ?? r.title} ${detail?.treatmenu ?? ''} ${r.title}`,
+          raw
+        );
+        restaurantAnalysis.set(r.contentid, { detail, analysis });
+        const level = veganLevelFromAnalysis(analysis);
+        r.veganLevel = level;
+      }),
+      5
+    );
+  } else {
+    for (const r of toAnalyze.values()) {
+      if (isRestaurantBlacklisted(r.title)) {
+        blacklistedRestaurantIds.add(r.contentid);
+        continue;
+      }
+      restaurantAnalysis.set(r.contentid, {
+        detail: null,
+        analysis: generalMenuAnalysis(r.title),
       });
-      const analysis = sanitizeVeganAnalysis(
-        `${detail?.firstmenu ?? r.title} ${detail?.treatmenu ?? ''} ${r.title}`,
-        raw
+    }
+  }
+
+  if (blacklistedRestaurantIds.size > 0) {
+    for (const plan of dayPlans) {
+      plan.mealCandidates = plan.mealCandidates.filter(
+        (r) => !blacklistedRestaurantIds.has(r.contentid)
       );
-      restaurantAnalysis.set(r.contentid, { detail, analysis });
-      // Keep pipeline veganLevel in sync for scoring/filters
-      const level = veganLevelFromAnalysis(analysis);
-      r.veganLevel = level;
-    }),
-    5
-  );
+    }
+    console.log('식당 블랙리스트 필터', {
+      excluded: blacklistedRestaurantIds.size,
+      ids: [...blacklistedRestaurantIds],
+    });
+  }
 
   console.log('Gemini 호출 완료', { analyzed: restaurantAnalysis.size });
 
@@ -403,25 +482,27 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
         : coords;
     plan.mealCandidates = [...plan.mealCandidates].sort(
       (a, b) =>
-        scoreRestaurantNear(b, highlight, isVegan) -
-        scoreRestaurantNear(a, highlight, isVegan)
+        scoreRestaurantNear(b, highlight, isVegan, profileMode) -
+        scoreRestaurantNear(a, highlight, isVegan, profileMode)
     );
   }
 
   const accessibilityMap = new Map<string, AccessibilityInfo | undefined>();
-  const attractionIds = dayPlans
-    .flatMap((p) => [p.morning?.contentid, p.afternoon?.contentid])
-    .filter(Boolean) as string[];
-  await runWithConcurrency(
-    attractionIds.map((id) => async () => {
-      try {
-        accessibilityMap.set(id, (await getAccessibilityInfo(id)) ?? undefined);
-      } catch {
-        accessibilityMap.set(id, undefined);
-      }
-    }),
-    5
-  );
+  if (isHealthFocused) {
+    const attractionIds = dayPlans
+      .flatMap((p) => [p.morning?.contentid, p.afternoon?.contentid])
+      .filter(Boolean) as string[];
+    await runWithConcurrency(
+      attractionIds.map((id) => async () => {
+        try {
+          accessibilityMap.set(id, (await getAccessibilityInfo(id)) ?? undefined);
+        } catch {
+          accessibilityMap.set(id, undefined);
+        }
+      }),
+      5
+    );
+  }
 
   const days: DayCourse[] = [];
   let hasVeganOptions = false;
@@ -440,7 +521,9 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
         if (picked.some((p) => p.contentid === r.contentid)) return;
         if (usedRestaurantIds.has(r.contentid)) return;
         const analysis = restaurantAnalysis.get(r.contentid)?.analysis;
-        if (!allowRed && analysis?.overallRisk === 'HIGH') return;
+        if (isHealthFocused && !allowRed && analysis?.overallRisk === 'HIGH') {
+          return;
+        }
         if (isVegan) {
           const vl =
             r.veganLevel ??
@@ -459,26 +542,75 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     const meals = pickMeals();
     const mealTimes = ['12:00', '18:00'] as const;
 
-    meals.forEach((restaurant, idx) => {
-      const pre = restaurantAnalysis.get(restaurant.contentid);
-      const analysis =
-        pre?.analysis ??
-        ({
-          overallRisk: 'LOW',
-          veganFriendly: true,
-          veganItems: [],
-          nonVeganIngredients: [],
-          menuItems: [],
-          recommendation: '현지에서 메뉴를 확인해 주세요.',
-          alternatives: [],
-          postMealAdvice: '식후 가벼운 산책을 권장합니다.',
-        } satisfies MenuAnalysis);
+    const dayHighlight = plan.morning
+      ? itemCoords(plan.morning)
+      : plan.afternoon
+        ? itemCoords(plan.afternoon)
+        : coords;
+    const dayMealMaxM = mealClusterMaxMeters(destination.areaCode);
 
-      const veganLevel =
-        isVegan && restaurant.veganLevel
+    let fallbackMeals: TourApiItem[] = [];
+    if (isVegan && meals.length === 0) {
+      fallbackMeals = rankRestaurantsNear(
+        generalRestaurantPool,
+        dayHighlight,
+        false,
+        usedRestaurantIds,
+        dayMealMaxM,
+        profileMode
+      ).slice(0, 2);
+      if (fallbackMeals.length > 0) {
+        console.log('비건 식당 fallback', {
+          day: d + 1,
+          restaurants: fallbackMeals.map((r) => r.title),
+        });
+      }
+    }
+
+    const mealEntries: Array<{ restaurant: TourApiItem; isFallback: boolean }> = [
+      ...meals.map((restaurant) => ({ restaurant, isFallback: false })),
+      ...fallbackMeals.map((restaurant) => ({ restaurant, isFallback: true })),
+    ];
+
+    mealEntries.forEach(({ restaurant, isFallback }, idx) => {
+      const pre = restaurantAnalysis.get(restaurant.contentid);
+      const fallbackAnalysis: MenuAnalysis = {
+        overallRisk: 'MEDIUM',
+        veganFriendly: 'PARTIAL',
+        veganItems: [],
+        nonVeganIngredients: [],
+        menuItems: [],
+        recommendation:
+          '주변에 확실한 비건 식당이 없어 일반 식당을 대안으로 안내합니다. 메뉴를 현장에서 확인해 주세요.',
+        alternatives: [],
+        postMealAdvice: '식사 전 비건 옵션 여부를 직원에게 확인해 주세요.',
+      };
+      const analysis =
+        isFallback
+          ? fallbackAnalysis
+          : pre?.analysis ??
+            (isHealthFocused
+              ? ({
+                  overallRisk: 'LOW',
+                  veganFriendly: true,
+                  veganItems: [],
+                  nonVeganIngredients: [],
+                  menuItems: [],
+                  recommendation: '현지에서 메뉴를 확인해 주세요.',
+                  alternatives: [],
+                  postMealAdvice: '식후 가벼운 산책을 권장합니다.',
+                } satisfies MenuAnalysis)
+              : generalMenuAnalysis(restaurant.title));
+
+      const veganLevel = isFallback
+        ? 'CHECK_NEEDED'
+        : isVegan && restaurant.veganLevel
           ? restaurant.veganLevel
           : veganLevelFromAnalysis(analysis);
-      if (veganLevel === 'FULL_VEGAN' || veganLevel === 'PARTIAL_VEGAN') {
+      if (
+        !isFallback &&
+        (veganLevel === 'FULL_VEGAN' || veganLevel === 'PARTIAL_VEGAN')
+      ) {
         hasVeganOptions = true;
       }
 
@@ -491,8 +623,9 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
         title: restaurant.title,
         address: restaurant.addr1,
         coordinates: { lat, lng },
-        safetyLevel: riskToSafety(analysis.overallRisk),
+        safetyLevel: isFallback ? 'YELLOW' : riskToSafety(analysis.overallRisk),
         veganLevel: isVegan ? veganLevel : undefined,
+        isVeganGuaranteed: isFallback ? false : undefined,
         hookLine: restaurantHookLine(restaurant.title, firstmenu),
         safetyReason: analysis.recommendation,
         healthTips: [analysis.postMealAdvice],
@@ -500,6 +633,10 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
         nearbyMedical: [],
         imageUrl: pickTourImageUrl(restaurant),
       });
+
+      if (isFallback) {
+        usedRestaurantIds.add(restaurant.contentid);
+      }
     });
 
     const pushAttraction = (
@@ -508,19 +645,31 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
       slot: 'morning' | 'afternoon'
     ) => {
       const { lat, lng } = tourCoords(attraction.mapx, attraction.mapy);
-      const accessibility = accessibilityMap.get(attraction.contentid);
-      const healthTips = isHot
-        ? ['더운 날엔 그늘·실내 동선 위주로', '수분 챙기기']
-        : ['여유 있게 둘러보기'];
+      const accessibility = isHealthFocused
+        ? accessibilityMap.get(attraction.contentid)
+        : undefined;
+      const healthTips = isHealthFocused
+        ? isHot
+          ? ['더운 날엔 그늘·실내 동선 위주로', '수분 챙기기']
+          : ['여유 있게 둘러보기']
+        : isHot
+          ? ['더운 날엔 실내·카페 스팟과 함께', '인증샷 포인트 미리 체크']
+          : ['핫플 포토존·주변 맛집 거리도 함께 둘러보기'];
 
       let safetyLevel: SafetyLevel = isHot ? 'YELLOW' : 'GREEN';
-      const safetyReason = isHot
-        ? '고온다습 — 오후 실내·그늘 코스 권장'
-        : slot === 'morning'
-          ? `${themeLabel(theme)} · 오전 하이라이트`
-          : `${themeLabel(theme)} · 오후 스팟`;
+      const safetyReason = isHealthFocused
+        ? isHot
+          ? '고온다습 — 오후 실내·그늘 코스 권장'
+          : slot === 'morning'
+            ? `${themeLabel(theme)} · 오전 하이라이트`
+            : `${themeLabel(theme)} · 오후 스팟`
+        : isHot
+          ? '인기 스팟 — 더운 시간대는 실내·카페와 함께'
+          : slot === 'morning'
+            ? `${themeLabel(theme)} · 오전 핫플`
+            : `${themeLabel(theme)} · 오후 추천 스팟`;
 
-      if (accessibility?.level === 'LOW') {
+      if (isHealthFocused && accessibility?.level === 'LOW') {
         healthTips.push('무장애 정보가 적어 이동 전 확인을 권장합니다.');
         if (safetyLevel === 'GREEN') safetyLevel = 'YELLOW';
       }
@@ -542,7 +691,7 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
         safetyReason,
         healthTips,
         nearbyMedical: [],
-        accessibility,
+        accessibility: isHealthFocused ? accessibility : undefined,
         imageUrl: pickTourImageUrl(attraction),
       });
     };
@@ -564,41 +713,83 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
       time: '13:30',
       type: 'REST',
       contentId: `rest-${d}`,
-      title: '식후 가벼운 산책',
+      title: isHealthFocused ? '식후 가벼운 산책' : '점심 후 카페·거리 산책',
       address: placeLabel,
       coordinates: restAnchor,
       safetyLevel: 'GREEN',
-      hookLine: '점심 이후 천천히 걸어 오후를 열기',
-      safetyReason: '식후 가벼운 보행으로 리듬 맞추기',
-      healthTips: ['무리하지 않는 선에서'],
+      hookLine: isHealthFocused
+        ? '점심 이후 천천히 걸어 오후를 열기'
+        : '점심 후 근처 카페·거리를 가볍게 둘러보기',
+      safetyReason: isHealthFocused
+        ? '식후 가벼운 보행으로 리듬 맞추기'
+        : '인기 거리·카페 동선으로 오후 코스 연결',
+      healthTips: isHealthFocused ? ['무리하지 않는 선에서'] : ['SNS 핫플·로컬 맛집 탐색'],
       nearbyMedical: [],
     });
 
-    // Wellness only on the last day (optional treat), not every day
-    const wellness =
-      wellnessWithPhotos.length > 0 && d === period.days - 1
-        ? wellnessWithPhotos[0]
-        : undefined;
-    if (wellness) {
-      const { lat, lng } = tourCoords(wellness.mapx, wellness.mapy);
-      const wLabel = wellness.theme
-        ? WELLNESS_THEME_LABEL[wellness.theme] ?? '힐링'
-        : '힐링';
-      schedules.push({
-        time: '16:30',
-        type: 'WELLNESS',
-        contentId: wellness.contentid,
-        title: wellness.title,
-        address: wellness.addr1,
-        coordinates: { lat, lng },
-        safetyLevel: 'GREEN',
-        hookLine: `여행 마지막, ${wLabel}로 마무리`,
-        safetyReason: `${wLabel} — 여유로운 마무리`,
-        healthTips: ['컨디션에 맞게 짧게'],
-        nearbyMedical: [],
-        wellnessTheme: wellness.theme,
-        imageUrl: pickTourImageUrl(wellness),
-      });
+    // 마지막 날 + 힐링 취향: 웰니스 스팟 또는 실제 명소 fallback
+    if (d === period.days - 1 && travelStyle === '힐링') {
+      const closingExclude = new Set<string>();
+      for (const dayPlan of dayPlans) {
+        if (dayPlan.morning) closingExclude.add(dayPlan.morning.contentid);
+        if (dayPlan.afternoon) closingExclude.add(dayPlan.afternoon.contentid);
+      }
+      usedRestaurantIds.forEach((id) => closingExclude.add(id));
+      for (const s of schedules) {
+        if (s.type !== 'REST') closingExclude.add(s.contentId);
+      }
+
+      const wellness =
+        wellnessWithPhotos.length > 0 ? wellnessWithPhotos[0] : undefined;
+
+      if (wellness) {
+        const { lat, lng } = tourCoords(wellness.mapx, wellness.mapy);
+        const wLabel = wellness.theme
+          ? WELLNESS_THEME_LABEL[wellness.theme] ?? '힐링'
+          : '힐링';
+        schedules.push({
+          time: '16:30',
+          type: 'WELLNESS',
+          contentId: wellness.contentid,
+          title: wellness.title,
+          address: wellness.addr1,
+          coordinates: { lat, lng },
+          safetyLevel: 'GREEN',
+          hookLine: `여행 마지막, ${wLabel}로 마무리`,
+          safetyReason: `${wLabel} — 여유로운 마무리`,
+          healthTips: ['컨디션에 맞게 짧게'],
+          nearbyMedical: [],
+          wellnessTheme: wellness.theme,
+          imageUrl: pickTourImageUrl(wellness),
+        });
+      } else {
+        const closingAnchor = plan.morning
+          ? itemCoords(plan.morning)
+          : plan.afternoon
+            ? itemCoords(plan.afternoon)
+            : coords;
+        const fallbackAttraction = rankAttractions(
+          wellnessClosingPool,
+          theme,
+          closingAnchor,
+          closingExclude,
+          profileMode
+        )[0];
+
+        if (fallbackAttraction) {
+          console.log('웰니스 데이터 부재 — 명소 fallback', {
+            day: d + 1,
+            title: fallbackAttraction.title,
+          });
+          pushAttraction(fallbackAttraction, '16:30', 'afternoon');
+          const closingSchedule = schedules[schedules.length - 1];
+          if (closingSchedule?.contentId === fallbackAttraction.contentid) {
+            closingSchedule.hookLine = '여행 마지막, 여유로운 명소로 마무리';
+            closingSchedule.safetyReason =
+              '웰니스 데이터가 없어 지역 관광·문화시설로 대체 안내';
+          }
+        }
+      }
     }
 
     days.push({
@@ -609,7 +800,9 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     });
   }
 
-  const spotMeta = await attachNearbyMedicalBySpot(days);
+  const spotMeta = isHealthFocused
+    ? await attachNearbyMedicalBySpot(days)
+    : null;
   if (spotMeta?.hiraFailed) {
     medicalMeta = {
       source:
@@ -654,13 +847,14 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     overallSafetyScore,
     hasVeganOptions: isVegan ? hasVeganOptions : false,
     alternatives,
-    warnings: healthProfile.insulinUser
-      ? [
-          {
-            level: 'INFO' as const,
-            message: '인슐린 투여 중 — 식사 시간을 맞춰 주세요.',
-          },
-        ]
-      : [],
+    warnings:
+      isHealthFocused && healthProfile.insulinUser
+        ? [
+            {
+              level: 'INFO' as const,
+              message: '인슐린 투여 중 — 식사 시간을 맞춰 주세요.',
+            },
+          ]
+        : [],
   };
 }

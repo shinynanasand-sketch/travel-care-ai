@@ -1,5 +1,6 @@
 import { tourCoords } from '@/lib/tourapi/client';
 import { distanceMeters } from '@/lib/geo/distance';
+import type { CourseProfileMode } from '@/lib/profile/healthConditions';
 import type { TourApiItem } from '@/types/tourapi.types';
 
 export type DayTheme = 'NATURE' | 'CULTURE' | 'CITY' | 'FOOD';
@@ -20,6 +21,12 @@ const THEME_HINTS: Record<DayTheme, RegExp> = {
   CITY: /거리|시장|타워|광장|마을|골목|야경|전망대|산책|로|동/,
   FOOD: /시장|맛|먹거리|거리|골목|카페|마을/,
 };
+
+const POPULAR_HINTS =
+  /핫플|명소|타워|시장|거리|카페|맛집|야경|해변|궁|박물관|공원|전망|벚꽃|문화|축제|랜드마크|성곽|한옥|마을|수목원|정원|동물원|아쿠아|테마파크/;
+
+const LOCAL_FOOD_HINTS =
+  /맛집|식당|카페|베이커리|브런치|로스터리|디저트|분식|해산물|갈비|국밥|떡볶이|파스타|스시|바|pub/i;
 
 export function themeForDay(dayIndex: number): DayTheme {
   return DAY_THEMES[dayIndex % DAY_THEMES.length];
@@ -76,15 +83,32 @@ export function scoreAttractionAppeal(
   return score;
 }
 
+/** 일반 여행객용 — 인기·핫플 키워드 가중 */
+export function scoreGeneralAppeal(
+  item: TourApiItem,
+  theme: DayTheme,
+  anchor?: { lat: number; lng: number }
+): number {
+  let score = scoreAttractionAppeal(item, theme, anchor);
+  const blob = `${item.title} ${item.addr1 ?? ''} ${item.lclsSystm3 ?? item.cat3 ?? ''}`;
+  if (POPULAR_HINTS.test(blob)) score += 30;
+  if (item.firstimage || item.firstimage2) score += 15;
+  return score;
+}
+
 export function rankAttractions(
   items: TourApiItem[],
   theme: DayTheme,
   anchor: { lat: number; lng: number },
-  excludeIds: Set<string>
+  excludeIds: Set<string>,
+  profileMode: CourseProfileMode = 'health'
 ): TourApiItem[] {
+  const scoreFn =
+    profileMode === 'general' ? scoreGeneralAppeal : scoreAttractionAppeal;
+
   return items
     .filter((a) => !excludeIds.has(a.contentid))
-    .map((a) => ({ a, s: scoreAttractionAppeal(a, theme, anchor) }))
+    .map((a) => ({ a, s: scoreFn(a, theme, anchor) }))
     .sort((x, y) => y.s - x.s || x.a.title.localeCompare(y.a.title, 'ko'))
     .map((x) => x.a);
 }
@@ -211,18 +235,19 @@ export function pickDayAttractions(
   theme: DayTheme,
   dayAnchor: { lat: number; lng: number },
   excludeIds: Set<string>,
-  pairMaxM: number
+  pairMaxM: number,
+  profileMode: CourseProfileMode = 'health'
 ): { morning?: TourApiItem; afternoon?: TourApiItem } {
-  const ranked = rankAttractions(pool, theme, dayAnchor, excludeIds);
+  const ranked = rankAttractions(pool, theme, dayAnchor, excludeIds, profileMode);
   const morning = ranked[0];
   if (!morning) return {};
   excludeIds.add(morning.contentid);
   const mC = itemCoords(morning);
   const afternoon =
-    rankAttractions(pool, theme, mC, excludeIds).find(
+    rankAttractions(pool, theme, mC, excludeIds, profileMode).find(
       (a) => distanceMeters(mC, itemCoords(a)) <= pairMaxM
     ) ??
-    rankAttractions(pool, theme, mC, excludeIds)[0];
+    rankAttractions(pool, theme, mC, excludeIds, profileMode)[0];
   if (afternoon) excludeIds.add(afternoon.contentid);
   return { morning, afternoon };
 }
@@ -277,7 +302,8 @@ export function restaurantHookLine(
 export function scoreRestaurantNear(
   item: TourApiItem,
   highlight: { lat: number; lng: number },
-  preferVegan: boolean
+  preferVegan: boolean,
+  profileMode: CourseProfileMode = 'health'
 ): number {
   const c = itemCoords(item);
   const m = distanceMeters(highlight, c);
@@ -289,6 +315,13 @@ export function scoreRestaurantNear(
   else score -= Math.min(40, Math.floor(m / 1000));
 
   if (item.firstimage || item.firstimage2) score += 10;
+
+  if (profileMode === 'general') {
+    const blob = `${item.title} ${item.addr1 ?? ''} ${item.cat3 ?? ''}`;
+    if (LOCAL_FOOD_HINTS.test(blob)) score += 25;
+    if (/카페|coffee|roastery/i.test(blob)) score += 15;
+  }
+
   if (preferVegan) {
     // Soft boost only — never outweigh hard distance filter
     if (item.veganLevel === 'FULL_VEGAN') score += 15;
@@ -313,7 +346,8 @@ export function rankRestaurantsNear(
   highlight: { lat: number; lng: number },
   preferVegan: boolean,
   excludeIds: Set<string>,
-  maxMeters = 5000
+  maxMeters = 5000,
+  profileMode: CourseProfileMode = 'health'
 ): TourApiItem[] {
   const within = (limit: number) =>
     pool
@@ -323,7 +357,10 @@ export function rankRestaurantsNear(
         return r.veganLevel !== 'NOT_VEGAN';
       })
       .filter((r) => distanceMeters(highlight, itemCoords(r)) <= limit)
-      .map((r) => ({ r, s: scoreRestaurantNear(r, highlight, preferVegan) }))
+      .map((r) => ({
+        r,
+        s: scoreRestaurantNear(r, highlight, preferVegan, profileMode),
+      }))
       .sort((x, y) => y.s - x.s)
       .map((x) => x.r);
 

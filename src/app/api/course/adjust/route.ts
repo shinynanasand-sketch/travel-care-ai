@@ -1,5 +1,6 @@
 import { assessBloodSugar, shouldNotifyGuardian } from '@/lib/ai/healthAdvisor';
 import { getNearbyPharmacies } from '@/lib/medical/hospital';
+import { hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 import { tourCoords } from '@/lib/tourapi/client';
 import { getVeganRestaurants } from '@/lib/tourapi/restaurant';
 import { sendGuardianNotification } from '@/lib/notification/firebase';
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
       guardianFcmTokens?: string[];
     };
     const isVegan = body.conditions.includes('VEGAN');
+    const isHealthFocused = hasHealthOrDietConditions(body.conditions);
 
     if (!body.bloodSugar) {
       return Response.json({
@@ -40,8 +42,11 @@ export async function POST(request: Request) {
         for (const g of guardians) {
           if (g.fcmToken) tokens.add(g.fcmToken);
         }
-      } catch {
-        // DB 미연결 — 클라이언트 토큰만 사용
+      } catch (dbError) {
+        console.error(
+          '[course/adjust] guardian.findMany DB 조회 실패 — localStorage 토큰만 사용:',
+          dbError
+        );
       }
 
       for (const t of body.guardianFcmTokens ?? []) {
@@ -63,7 +68,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (body.currentLocation && assessment.level !== 'NORMAL') {
+    if (isHealthFocused && body.currentLocation && assessment.level !== 'NORMAL') {
       const { lat, lng } = body.currentLocation;
       const [pharmacies, veganRestaurants] = await Promise.all([
         getNearbyPharmacies(lat, lng, 2000),

@@ -114,7 +114,10 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">질환·식이 유형</CardTitle>
+          <CardTitle className="text-base">
+            질환·식이 유형{' '}
+            <span className="text-sm font-normal text-gray-400">(선택)</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <DietSelector selected={conditions} onChange={setConditions} />
@@ -134,12 +137,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Button
-        type="submit"
-        className="w-full"
-        size="lg"
-        disabled={conditions.length === 0}
-      >
+      <Button type="submit" className="w-full" size="lg">
         시작하기
       </Button>
     </form>

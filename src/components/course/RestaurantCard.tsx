@@ -15,6 +15,7 @@ interface RestaurantCardProps {
   imageUrl?: string;
   safetyLevel: Schedule['safetyLevel'];
   veganLevel?: Schedule['veganLevel'];
+  isVeganGuaranteed?: Schedule['isVeganGuaranteed'];
   safetyReason: string;
   openTime?: string;
 }
@@ -27,6 +28,7 @@ export function RestaurantCard({
   imageUrl,
   safetyLevel,
   veganLevel,
+  isVeganGuaranteed,
   safetyReason,
   openTime,
 }: RestaurantCardProps) {
@@ -45,6 +47,11 @@ export function RestaurantCard({
       />
       <CardHeader className="pb-2">
         <CardTitle className="text-base">🍽️ {title}</CardTitle>
+        {isVeganGuaranteed === false && (
+          <div className="mt-2 rounded-lg border-2 border-orange-400 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-900">
+            ⚠️ 주변에 비건 식당이 없어 대안으로 안내합니다
+          </div>
+        )}
         {hookLine && (
           <p className="text-sm font-medium text-amber-900">{hookLine}</p>
         )}

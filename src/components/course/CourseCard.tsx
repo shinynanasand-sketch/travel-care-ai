@@ -117,6 +117,7 @@ export function CourseCard({
       ? dayCourse.schedules.filter(
           (s) =>
             s.type !== 'RESTAURANT' ||
+            s.isVeganGuaranteed === false ||
             (s.veganLevel && s.veganLevel !== 'NOT_VEGAN')
         )
       : dayCourse.schedules;
@@ -201,6 +202,7 @@ export function CourseCard({
                   imageUrl={schedule.imageUrl}
                   safetyLevel={schedule.safetyLevel}
                   veganLevel={schedule.veganLevel}
+                  isVeganGuaranteed={schedule.isVeganGuaranteed}
                   safetyReason={schedule.safetyReason}
                 />
               )}

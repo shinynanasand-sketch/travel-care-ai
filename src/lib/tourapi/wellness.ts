@@ -61,12 +61,12 @@ export async function getWellnessCourse(
   radius = 10000,
   numOfRows = 10
 ): Promise<WellnessItem[]> {
+  if (!isTourApiConfigured()) {
+    return [];
+  }
+
   const mapX = String(Math.round(lng * 10000000));
   const mapY = String(Math.round(lat * 10000000));
-
-  if (!isTourApiConfigured()) {
-    return getMockWellness(lat, lng);
-  }
 
   const cacheKey = buildCacheKey('tourapi', 'wellnessLocation', {
     mapX,
@@ -91,38 +91,11 @@ export async function getWellnessCourse(
       { baseUrl: WELLNESS_BASE }
     );
     const raws = parseTourResponse<WellnessRaw>(data);
-    if (raws.length === 0) return getMockWellness(lat, lng);
+    if (raws.length === 0) return [];
     const items = raws.map(toWellnessItem);
     await setCache(cacheKey, items, CACHE_TTL.wellness);
     return items;
   } catch {
-    return getMockWellness(lat, lng);
+    return [];
   }
-}
-
-function getMockWellness(lat: number, lng: number): WellnessItem[] {
-  const mock: Array<Omit<WellnessItem, 'theme'>> = [
-    {
-      contentid: 'wl-mock-1',
-      title: '웰니스 힐링 스파',
-      addr1: '온천·휴양 시설',
-      mapx: String(Math.round((lng + 0.01) * 10000000)),
-      mapy: String(Math.round((lat + 0.01) * 10000000)),
-    },
-    {
-      contentid: 'wl-mock-2',
-      title: '자연 치유의 숲',
-      addr1: '삼림욕·명상 코스',
-      mapx: String(Math.round((lng + 0.02) * 10000000)),
-      mapy: String(Math.round((lat + 0.02) * 10000000)),
-    },
-    {
-      contentid: 'wl-mock-3',
-      title: '전통 한옥 스테이',
-      addr1: '한옥 휴양 숙소',
-      mapx: String(Math.round((lng - 0.01) * 10000000)),
-      mapy: String(Math.round((lat - 0.01) * 10000000)),
-    },
-  ];
-  return mock.map((m) => ({ ...m, theme: classifyWellnessTheme(m) }));
 }

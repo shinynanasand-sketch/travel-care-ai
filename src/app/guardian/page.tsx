@@ -9,8 +9,6 @@ export default function GuardianPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [relationship, setRelationship] = useState('');
-  const [fcmToken, setFcmToken] = useState('');
-  const [notifyLevel, setNotifyLevel] = useState('WARNING');
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -21,8 +19,6 @@ export default function GuardianPage() {
       name,
       phone,
       relationship,
-      notifyLevel,
-      fcmToken: fcmToken.trim() || undefined,
     });
     localStorage.setItem('guardians', JSON.stringify(guardians));
     setSaved(true);
@@ -32,7 +28,7 @@ export default function GuardianPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold">보호자 설정</h1>
       <p className="text-sm text-gray-500">
-        혈당 위험 시 보호자에게 FCM 알림을 전송합니다.
+        저혈당 등 위급 상황 발생 시, 등록된 보호자에게 즉시 긴급 알림을 전송합니다.
       </p>
 
       <Card>
@@ -47,27 +43,6 @@ export default function GuardianPage() {
             value={relationship}
             onChange={(e) => setRelationship(e.target.value)}
           />
-          <Input
-            placeholder="FCM 토큰 (실알림 시 필요, 선택)"
-            value={fcmToken}
-            onChange={(e) => setFcmToken(e.target.value)}
-          />
-          <p className="text-xs text-gray-400">
-            Firebase 프로젝트 설정 + 기기 토큰이 있어야 실제 푸시가 전송됩니다.
-            미설정 시 서버는 mock 로그만 남깁니다.
-          </p>
-          <div>
-            <p className="mb-2 text-sm text-gray-600">알림 레벨</p>
-            <select
-              value={notifyLevel}
-              onChange={(e) => setNotifyLevel(e.target.value)}
-              className="w-full rounded-lg border p-3 text-base"
-            >
-              <option value="WARNING">경고 이상</option>
-              <option value="DANGER">위험 이상</option>
-              <option value="EMERGENCY">응급만</option>
-            </select>
-          </div>
         </CardContent>
       </Card>
 

@@ -31,6 +31,8 @@ export interface Schedule {
   coordinates: { lat: number; lng: number };
   safetyLevel: SafetyLevel;
   veganLevel?: VeganLevel;
+  /** 비건 보장 여부 — false면 일반 식당 fallback */
+  isVeganGuaranteed?: boolean;
   /** Travel-facing one-liner (shown before care copy). */
   hookLine?: string;
   safetyReason: string;

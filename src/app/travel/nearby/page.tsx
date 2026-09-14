@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { KakaoMap } from '@/components/map/KakaoMap';
 import { MedicalMarker } from '@/components/map/MedicalMarker';
@@ -9,9 +9,12 @@ import {
   MedicalDiagnosticsBanner,
   MedicalSourceBadge,
 } from '@/components/medical/MedicalDiagnosticsBanner';
+import { MedicalSummaryModal } from '@/components/medical/MedicalSummaryModal';
 import { Button } from '@/components/ui/button';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useHealthMonitor } from '@/hooks/useHealthMonitor';
 import { useUserProfileStore } from '@/store/userProfileStore';
+import { buildMedicalSummary } from '@/lib/medical/medicalSummary';
 import { isValidCoord } from '@/lib/geo/distance';
 import { tourCoords } from '@/lib/tourapi/client';
 import type { MedicalFacility, MedicalLookupMeta } from '@/types/medical.types';
@@ -42,8 +45,10 @@ function mergeMeta(
 
 export default function TravelNearbyPage() {
   const { lat, lng, loading: geoLoading } = useGeolocation();
-  const { healthProfile } = useUserProfileStore();
+  const { healthProfile, name } = useUserProfileStore();
+  const { latestBloodSugar } = useHealthMonitor();
   const isVegan = healthProfile?.conditions.includes('VEGAN') ?? false;
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [hospitals, setHospitals] = useState<MedicalFacility[]>([]);
   const [pharmacies, setPharmacies] = useState<MedicalFacility[]>([]);
   const [veganRestaurants, setVeganRestaurants] = useState<TourApiItem[]>([]);
@@ -82,6 +87,11 @@ export default function TravelNearbyPage() {
       .finally(() => setFetching(false));
   }, [lat, lng, isVegan]);
 
+  const medicalSummary = useMemo(
+    () => buildMedicalSummary(name, healthProfile, latestBloodSugar),
+    [name, healthProfile, latestBloodSugar]
+  );
+
   const center = { lat: lat ?? 37.5665, lng: lng ?? 126.978 };
   const markers = [
     ...hospitals
@@ -119,7 +129,23 @@ export default function TravelNearbyPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">주변 시설</h1>
+      <div className="space-y-3">
+        <h1 className="text-xl font-bold">주변 시설</h1>
+        <Button
+          variant={medicalSummary.isCrisis ? 'danger' : 'default'}
+          size="lg"
+          className="w-full text-base font-bold"
+          onClick={() => setSummaryOpen(true)}
+        >
+          🏥 의료진에게 내 상태 보여주기
+        </Button>
+      </div>
+
+      <MedicalSummaryModal
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        summary={medicalSummary}
+      />
 
       <KakaoMap center={center} markers={markers} height="250px" />
 

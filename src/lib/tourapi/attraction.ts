@@ -64,6 +64,61 @@ export async function getAttractionsByArea(
   }
 }
 
+/** 문화시설 (contentTypeId=14) — 웰니스 부재 시 마무리 명소 fallback 풀 */
+export async function getCulturalFacilitiesByArea(
+  areaCode: string,
+  sigunguCode?: string
+): Promise<AttractionItem[]> {
+  if (!isTourApiConfigured()) {
+    return [];
+  }
+
+  const cacheKey = buildCacheKey('tourapi', 'areaBased', {
+    areaCode,
+    sigunguCode: sigunguCode ?? '',
+    contentTypeId: 14,
+    v: 'ldong1',
+  });
+  const cached = await getCached<AttractionItem[]>(cacheKey);
+  if (cached && cached.length > 0) return cached;
+
+  const areaParams = tourAreaFilterParams(areaCode, sigunguCode);
+
+  try {
+    const { data } = await tourApiClient.get('/areaBasedList2', {
+      params: {
+        ...getCommonParams(),
+        ...areaParams,
+        contentTypeId: 14,
+        numOfRows: 30,
+        arrange: 'O',
+      },
+    });
+    let items = parseTourResponse<AttractionItem>(data);
+
+    if (items.length === 0 && sigunguCode) {
+      const wideParams = tourAreaFilterParams(areaCode, undefined);
+      const { data: wide } = await tourApiClient.get('/areaBasedList2', {
+        params: {
+          ...getCommonParams(),
+          ...wideParams,
+          contentTypeId: 14,
+          numOfRows: 30,
+          arrange: 'O',
+        },
+      });
+      items = parseTourResponse<AttractionItem>(wide);
+    }
+
+    if (items.length > 0) {
+      await setCache(cacheKey, items, CACHE_TTL.areaBasedList);
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 /** 좌표 기반 명소 — 지역코드 장애 시 보험 */
 export async function getAttractionsByLocation(
   lat: number,
