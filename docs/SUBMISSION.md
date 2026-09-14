@@ -38,14 +38,17 @@ Travel Care AI는 한국관광공사 KorService2·무장애·웰니스 API를 �
 3) searchKeyword2 — 비건/채식 키워드 검색 (3단계 파이프라인 1단계)
 4) detailIntro2 — 음식점 대표·취급 메뉴 → Gemini 건강·비건 분석
 5) KorWithService2 detailWithTour2 — 무장애(휠체어·엘리베이터 등) → 일정 안전등급 보강
-6) WellnessTursmService locationBasedList — 마지막 날 웰니스 스팟
+6) WellnessTursmService locationBasedList — 사용자 취향('힐링') 및 해당 지역 내 데이터 존재 여부에 따른 조건부 웰니스 스팟 유연 배정 (데이터 부재 시 일반 명소로 자동 대체)
 7) 관광기상(/api/weather) — 고온다습 시 야외 일정 안내
 
 부가: travelStyle(힐링·액티비티 등) 반영 Gemini 명소 선정,
 firstimage 있는 고화질 장소 우선 필터, 결과 화면 썸네일·대안 장소 제안,
 하루 오전·오후 2명소 + 식사 클러스터, 시 전체 시 일자별 권역 묶기,
 결과 화면에서 하루 재생성·장소 교체(/api/course/edit).
-비건: searchKeyword2 + 광역 스코어링 + detailIntro2/Gemini.
+웰니스·비건 등 API 응답이 비었거나 필터 후 후보가 없을 때
+샘플·가짜 데이터로 일정을 채우지 않고, areaBased/locationBased 등
+실제 TourAPI 명소·일반 식당 풀로 Fallback 우회(대안 식당은 isVeganGuaranteed=false로 표시).
+비건: searchKeyword2 + 광역 스코어링 + detailIntro2/Gemini + 블랙리스트 사전 필터.
 ```
 
 해시태그(기능 설명):  
@@ -90,8 +93,10 @@ npm run test:demo-preflight  # 촬영 전 점검
 - [ ] 참가신청서 (포털 양식 — 위 활용 내역·URL 붙여넣기)
 - [x] TourAPI 활용 내역 초안 (본 문서 섹션)
 - [x] 해시태그 문구 확정
+- [x] 기능설명서 복붙 초안 ([FUNCTIONAL_DESCRIPTION.md](./FUNCTIONAL_DESCRIPTION.md) · 지정과제 5번 · 팀 나의성)
 - [x] Vercel URL + GitHub URL
 - [ ] 데모 영상 5분 (위 대본으로 촬영)
+- [ ] 기능설명서 PPT 양식에 문구·이미지 반영 후 제출
 - [ ] https://api.visitkorea.or.kr 제출 완료
 
 ## FCM 블로커 (선택 · 마감 후 가능)
