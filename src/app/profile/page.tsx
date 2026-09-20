@@ -38,6 +38,9 @@ function ProfileForm() {
   const [restrictions, setRestrictions] = useState(
     healthProfile?.restrictions.join(', ') ?? ''
   );
+  const [medications, setMedications] = useState(
+    healthProfile?.medications.join(', ') ?? ''
+  );
 
   // localStorage에 저장된 임시 프로필이 있으면 당뇨·비건 등 선택 상태 복원
   useEffect(() => {
@@ -66,7 +69,10 @@ function ProfileForm() {
     setName(userName);
     setHealthProfile({
       conditions,
-      medications: [],
+      medications: medications
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean),
       activityLevel,
       insulinUser,
       restrictions: restrictions
@@ -93,6 +99,7 @@ function ProfileForm() {
     setInsulinUser(false);
     setActivityLevel('MEDIUM');
     setRestrictions('');
+    setMedications('');
     router.push('/');
   };
 
@@ -168,6 +175,25 @@ function ProfileForm() {
         </CardHeader>
         <CardContent>
           <DietSelector selected={conditions} onChange={setConditions} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            복용 약물{' '}
+            <span className="text-sm font-normal text-gray-400">(선택)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            placeholder="인슐린, 메트포르민 (쉼표로 구분)"
+            value={medications}
+            onChange={(e) => setMedications(e.target.value)}
+          />
+          <p className="mt-2 text-xs text-gray-500">
+            의료진에게 보여주기 요약에 포함됩니다. (참고용)
+          </p>
         </CardContent>
       </Card>
 

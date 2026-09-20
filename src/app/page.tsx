@@ -1,9 +1,20 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileGateLink } from '@/components/common/ProfileGateLink';
+import { useUserProfileStore } from '@/store/userProfileStore';
+import { useUserProfileHydrated } from '@/hooks/useUserProfileHydrated';
+import { useTravelPlanStore } from '@/store/travelPlanStore';
 
 export default function HomePage() {
+  const hydrated = useUserProfileHydrated();
+  const healthProfile = useUserProfileStore((s) => s.healthProfile);
+  const course = useTravelPlanStore((s) => s.course);
+  const hasProfile = hydrated && Boolean(healthProfile);
+  const hasCourse = hydrated && Boolean(course);
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 p-6 text-white">
@@ -37,20 +48,41 @@ export default function HomePage() {
 
       <div className="flex flex-col gap-3">
         <Link href="/profile">
-          <Button className="w-full" size="lg">
-            1. 건강·식이 프로필 등록
+          <Button
+            variant={hasProfile ? 'outline' : 'default'}
+            className="w-full"
+            size="lg"
+          >
+            {hasProfile ? '1. 프로필 수정' : '1. 건강·식이 프로필 등록'}
           </Button>
         </Link>
         <ProfileGateLink href="/plan" className="block w-full">
-          <Button variant="outline" className="w-full" size="lg">
-            2. 여행 코스 만들기
+          <Button
+            variant={hasProfile && !hasCourse ? 'default' : 'outline'}
+            className="w-full"
+            size="lg"
+          >
+            {hasCourse ? '2. 여행 코스 다시 만들기' : '2. 여행 코스 만들기'}
           </Button>
         </ProfileGateLink>
         <ProfileGateLink href="/travel" className="block w-full">
-          <Button variant="outline" className="w-full" size="lg">
-            3. 여행 중 건강 모니터링
+          <Button
+            variant={hasCourse ? 'default' : 'outline'}
+            className="w-full"
+            size="lg"
+          >
+            {hasCourse
+              ? '3. 이어서 여행 중 모니터링'
+              : '3. 여행 중 건강 모니터링'}
           </Button>
         </ProfileGateLink>
+        {hasCourse && (
+          <Link href="/plan/result">
+            <Button variant="outline" className="w-full" size="lg">
+              저장된 코스 보기
+            </Button>
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import {
   getRestaurantsByLocation,
   getVeganRestaurants,
 } from '@/lib/tourapi/restaurant';
+import { filterItemsBySigunguName } from '@/lib/tourapi/districtFilter';
+import { getSigungu } from '@/lib/data/korea-sigungu';
 import { errorResponse } from '@/lib/utils/api-error';
 
 function parseCoord(raw: string | null): number | null {
@@ -22,11 +24,18 @@ export async function GET(request: Request) {
       );
     }
     const vegan = searchParams.get('vegan') === 'true';
-    const areaCode = searchParams.get('areaCode') ?? undefined;
+    const areaCode = searchParams.get('areaCode') ?? '1';
+    const sigunguCode = searchParams.get('sigunguCode') ?? undefined;
+    const sigunguName = sigunguCode
+      ? getSigungu(areaCode, sigunguCode)?.name
+      : undefined;
 
     const restaurants = vegan
-      ? await getVeganRestaurants(lat, lng, areaCode)
-      : await getRestaurantsByLocation(lat, lng);
+      ? await getVeganRestaurants(lat, lng, areaCode, sigunguCode)
+      : filterItemsBySigunguName(
+          await getRestaurantsByLocation(lat, lng, 2000, areaCode),
+          sigunguName
+        );
 
     return Response.json({ restaurants });
   } catch (error) {

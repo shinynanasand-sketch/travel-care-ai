@@ -20,7 +20,9 @@ export function BottomNav() {
       <div className="flex justify-around py-2">
         {navItems.map((item) => {
           const active =
-            pathname === item.href || pathname.startsWith(item.href + '/');
+            pathname === item.href ||
+            pathname.startsWith(item.href + '/') ||
+            (item.href === '/profile' && pathname.startsWith('/guardian'));
           const className = cn(
             'flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 text-xs',
             active ? 'text-emerald-600 font-semibold' : 'text-gray-500'

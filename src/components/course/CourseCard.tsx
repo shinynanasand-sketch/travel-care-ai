@@ -166,6 +166,18 @@ export function CourseCard({
           </div>
         )}
 
+        {veganFilter &&
+          schedules.filter((s) => s.type === 'RESTAURANT').length === 0 && (
+            <p className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900">
+              이날 일정에 표시할 비건·채식 식당이 없습니다. 필터를 끄거나 「이
+              날만 다시 뽑기」를 시도해 보세요.
+            </p>
+          )}
+
+        {schedules.length === 0 && !veganFilter && (
+          <p className="text-sm text-gray-500">이 날 일정이 없습니다.</p>
+        )}
+
         {schedules.map((schedule, i) => {
           const swapBusy =
             busyKey ===

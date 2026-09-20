@@ -23,6 +23,8 @@ import {
   veganLevelFromAnalysis,
   type VeganScoreItem,
 } from '@/lib/ai/menuAnalyzer';
+import { filterItemsBySigunguName } from '@/lib/tourapi/districtFilter';
+import { getSigungu } from '@/lib/data/korea-sigungu';
 import type { RestaurantDetail, TourApiItem } from '@/types/tourapi.types';
 
 const VEGAN_KEYWORDS = ['비건', '채식', 'vegan', '베지테리안', '비건카페'];
@@ -129,11 +131,12 @@ async function veganStep1Keyword(
   }));
 }
 
-// Step 2: 광역 수집 → 프리필터 → 배치 스코어링 → 상위 후보
+// Step 2: 광역 수집 → 구 후필터 → 프리필터 → 배치 스코어링 → 상위 후보
 async function veganStep2Scored(
   lat: number,
   lng: number,
-  areaCode: string
+  areaCode: string,
+  sigunguCode?: string
 ): Promise<TourApiItem[]> {
   const wide = await getRestaurantsByLocation(
     lat,
@@ -142,7 +145,11 @@ async function veganStep2Scored(
     areaCode,
     WIDE_ROWS
   );
-  const candidates = wide.filter(
+  const sigunguName = sigunguCode
+    ? getSigungu(areaCode, sigunguCode)?.name
+    : undefined;
+  const inDistrict = filterItemsBySigunguName(wide, sigunguName);
+  const candidates = inDistrict.filter(
     (r) => !isObviousMeatOnly(scoreCatInput(r))
   );
   if (candidates.length === 0) return [];
@@ -207,13 +214,19 @@ export async function getVeganRestaurants(
 
     let step3: TourApiItem[] = [];
     try {
-      const step2 = await veganStep2Scored(lat, lng, areaCode);
+      const step2 = await veganStep2Scored(lat, lng, areaCode, sigunguCode);
       step3 = await veganStep3Detail(step2);
     } catch {
       step3 = [];
     }
 
-    const merged = deduplicateByContentId([...step1, ...step3]);
+    const sigunguName = sigunguCode
+      ? getSigungu(areaCode, sigunguCode)?.name
+      : undefined;
+    const merged = filterItemsBySigunguName(
+      deduplicateByContentId([...step1, ...step3]),
+      sigunguName
+    );
     if (merged.length === 0) return [];
     await setCache(cacheKey, merged, CACHE_TTL.veganSearch);
     return merged;

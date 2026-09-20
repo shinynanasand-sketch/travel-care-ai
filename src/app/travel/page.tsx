@@ -59,27 +59,8 @@ export default function TravelPage() {
     let unsubscribeForeground: (() => void) | null = null;
     let cancelled = false;
 
-    const setupFcm = async () => {
-      const result = await requestFcmToken();
-      if (cancelled) return;
-
-      if (result.token) {
-        setFcmToken(result.token);
-        setFcmSetupMessage(
-          '알림 권한이 허용되었습니다. 저혈당 시 기기 알림을 받을 수 있습니다.'
-        );
-      } else if (result.permission === 'denied') {
-        setFcmSetupMessage(
-          '알림 권한이 거부되어 FCM 토큰을 발급하지 못했습니다.'
-        );
-      } else if (result.error === 'missing_vapid_key') {
-        setFcmSetupMessage(
-          'NEXT_PUBLIC_FIREBASE_VAPID_KEY가 설정되지 않았습니다.'
-        );
-      } else if (result.error) {
-        setFcmSetupMessage(`FCM 토큰 발급 실패: ${result.error}`);
-      }
-
+    // 권한 팝업은 보호자 등록·저혈당 시에만 — 마운트에서는 수신 구독만 시도
+    const setupForeground = async () => {
       const unsubscribe = await subscribeForegroundMessages((payload) => {
         if (payload.title || payload.body) {
           showStatusToast(
@@ -94,7 +75,7 @@ export default function TravelPage() {
       }
     };
 
-    void setupFcm();
+    void setupForeground();
 
     return () => {
       cancelled = true;
@@ -103,8 +84,32 @@ export default function TravelPage() {
         clearTimeout(guardianToastTimerRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only FCM setup
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only foreground subscribe
   }, []);
+
+  const ensureDeviceFcmToken = async (): Promise<string | null> => {
+    if (fcmToken) return fcmToken;
+    const result = await requestFcmToken();
+    if (result.token) {
+      setFcmToken(result.token);
+      setFcmSetupMessage(
+        '알림 권한이 허용되었습니다. 저혈당 시 기기 알림을 받을 수 있습니다.'
+      );
+      return result.token;
+    }
+    if (result.permission === 'denied') {
+      setFcmSetupMessage(
+        '알림 권한이 거부되어 FCM 토큰을 발급하지 못했습니다.'
+      );
+    } else if (result.error === 'missing_vapid_key') {
+      setFcmSetupMessage(
+        'NEXT_PUBLIC_FIREBASE_VAPID_KEY가 설정되지 않았습니다.'
+      );
+    } else if (result.error) {
+      setFcmSetupMessage(`FCM 토큰 발급 실패: ${result.error}`);
+    }
+    return null;
+  };
 
   const medicalSummary = useMemo(
     () => buildMedicalSummary(name, healthProfile, latestBloodSugar),
@@ -136,11 +141,16 @@ export default function TravelPage() {
       .filter((g) => g.name && g.phone)
       .map((g) => `${g.name} ${g.phone}`);
 
+    let deviceToken: string | null = fcmToken;
+    if (guardianTokens.length === 0) {
+      deviceToken = await ensureDeviceFcmToken();
+    }
+
     const tokensToNotify =
       guardianTokens.length > 0
         ? guardianTokens
-        : fcmToken
-          ? [fcmToken]
+        : deviceToken
+          ? [deviceToken]
           : [];
 
     if (tokensToNotify.length === 0) {
