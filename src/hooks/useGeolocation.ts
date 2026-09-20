@@ -9,6 +9,9 @@ interface GeolocationState {
   loading: boolean;
 }
 
+/**
+ * 실제 GPS만 반환한다. 실패 시 서울 좌표로 묵시 폴백하지 않는다.
+ */
 export function useGeolocation(): GeolocationState {
   const [state, setState] = useState<GeolocationState>({
     lat: null,
@@ -19,7 +22,12 @@ export function useGeolocation(): GeolocationState {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setState({ lat: 37.5665, lng: 126.978, error: null, loading: false });
+      setState({
+        lat: null,
+        lng: null,
+        error: '이 기기는 위치 정보를 지원하지 않습니다.',
+        loading: false,
+      });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -32,9 +40,9 @@ export function useGeolocation(): GeolocationState {
         }),
       () =>
         setState({
-          lat: 37.5665,
-          lng: 126.978,
-          error: '위치 정보를 가져올 수 없습니다.',
+          lat: null,
+          lng: null,
+          error: '위치 정보를 가져올 수 없습니다. 권한을 허용해 주세요.',
           loading: false,
         })
     );

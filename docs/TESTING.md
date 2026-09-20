@@ -1,7 +1,6 @@
 # 테스트 시나리오 가이드
 
-> 실API(`USE_MOCK_DATA=false`) 스모크 시 지역·분류코드 전환 이슈는  
-> `../docs/11-tourapi-code-migration.md` 를 함께 확인한다.
+> 실API(`USE_MOCK_DATA=false`) 스모크 시 TourAPI·지역코드는 [SUBMISSION.md](./SUBMISSION.md)·[DEPLOY.md](./DEPLOY.md)를 함께 확인한다.
 
 ## 시나리오 A — 당뇨 환자 코스 생성
 

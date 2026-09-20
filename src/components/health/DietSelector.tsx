@@ -109,7 +109,7 @@ export function DietSelector({ selected, onChange }: DietSelectorProps) {
       <p className="text-xs text-gray-500">
         질환·식이 유형은 선택 사항입니다. 해당 없으면 &apos;해당 없음(일반)&apos;을
         누르거나 비워 두고 시작하세요. 복합 선택도 가능합니다 (예: 당뇨 + 비건).
-        AI 분석은 참고용이며 의료 진단이 아닙니다.
+        AI 분석은 참고용이며 의료 진단·처방이 아닙니다.
       </p>
     </div>
   );

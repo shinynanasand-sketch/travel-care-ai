@@ -31,9 +31,9 @@ http://localhost:3000 에서 확인
 
 - 질환+식이 프로필 등록 (당뇨, 고혈압, 비건 등)
 - TourAPI 기반 안전 여행 코스 생성
-- Gemini AI 메뉴 건강·비건 분석
-- 건강/비건 신호등 4단계
-- 실시간 혈당 모니터링 및 주변 약국·병원 안내
+- Gemini AI 메뉴 건강·비건 분석 (gemini-2.5-flash)
+- 건강 신호등 3단계 · 비건 신호등 4단계
+- 혈당·혈압 기록(수동 입력) 및 주변 약국·병원 안내
 - 주변 의료시설·비건 식당 지도
 
 ## API 키 발급
@@ -49,6 +49,6 @@ http://localhost:3000 에서 확인
 
 ## 기술 스택
 
-Next.js 14, TypeScript, Tailwind CSS, Prisma, Gemini 2.0 Flash, TourAPI, Kakao Maps
+Next.js 14, TypeScript, Tailwind CSS, Prisma, Gemini 2.5 Flash, TourAPI, Kakao Maps
 
 > AI 분석은 참고용이며 의료 진단·처방이 아닙니다.

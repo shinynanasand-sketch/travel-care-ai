@@ -17,8 +17,11 @@ import { useUserProfileStore } from '@/store/userProfileStore';
 import { buildMedicalSummary } from '@/lib/medical/medicalSummary';
 import { isValidCoord } from '@/lib/geo/distance';
 import { tourCoords } from '@/lib/tourapi/client';
+import { wantsPlantBasedDining } from '@/lib/profile/healthConditions';
 import type { MedicalFacility, MedicalLookupMeta } from '@/types/medical.types';
 import type { TourApiItem } from '@/types/tourapi.types';
+import { useRouter } from 'next/navigation';
+import { useUserProfileHydrated } from '@/hooks/useUserProfileHydrated';
 
 function mergeMeta(
   a?: MedicalLookupMeta,
@@ -44,10 +47,12 @@ function mergeMeta(
 }
 
 export default function TravelNearbyPage() {
-  const { lat, lng, loading: geoLoading } = useGeolocation();
+  const router = useRouter();
+  const hydrated = useUserProfileHydrated();
+  const { lat, lng, loading: geoLoading, error: geoError } = useGeolocation();
   const { healthProfile, name } = useUserProfileStore();
   const { latestBloodSugar } = useHealthMonitor();
-  const isVegan = healthProfile?.conditions.includes('VEGAN') ?? false;
+  const plantBased = wantsPlantBasedDining(healthProfile?.conditions);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [hospitals, setHospitals] = useState<MedicalFacility[]>([]);
   const [pharmacies, setPharmacies] = useState<MedicalFacility[]>([]);
@@ -69,7 +74,7 @@ export default function TravelNearbyPage() {
       fetch(`/api/medical/pharmacy?lat=${lat}&lng=${lng}&radius=2000`).then((r) =>
         r.json()
       ),
-      isVegan
+      plantBased
         ? fetch(`/api/restaurant/list?lat=${lat}&lng=${lng}&vegan=true`).then((r) =>
             r.json()
           )
@@ -85,14 +90,58 @@ export default function TravelNearbyPage() {
         setFetchError('주변 시설 정보를 불러오지 못했습니다.');
       })
       .finally(() => setFetching(false));
-  }, [lat, lng, isVegan]);
+  }, [lat, lng, plantBased]);
 
   const medicalSummary = useMemo(
     () => buildMedicalSummary(name, healthProfile, latestBloodSugar),
     [name, healthProfile, latestBloodSugar]
   );
 
-  const center = { lat: lat ?? 37.5665, lng: lng ?? 126.978 };
+  if (hydrated && !healthProfile) {
+    return (
+      <div className="space-y-4 text-center">
+        <p>주변 시설 안내를 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <Button onClick={() => router.push('/profile?next=/travel/nearby')}>
+          프로필 등록
+        </Button>
+      </div>
+    );
+  }
+
+  if (geoLoading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold">주변 시설</h1>
+        <p className="text-center text-sm text-gray-500">위치를 확인하는 중...</p>
+      </div>
+    );
+  }
+
+  if (!lat || !lng) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold">주변 시설</h1>
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          {geoError ??
+            '현재 위치를 확인할 수 없습니다. 브라우저 위치 권한을 허용한 뒤 다시 시도해 주세요.'}
+        </p>
+        <p className="text-xs text-gray-500">
+          잘못된 도시(예: 서울)의 시설을 보여 주지 않도록, 위치가 없으면 조회하지
+          않습니다.
+        </p>
+        <Link href="/travel">
+          <Button variant="outline" className="w-full">
+            돌아가기
+          </Button>
+        </Link>
+        <p className="text-center text-xs text-gray-400">
+          안내 정보는 참고용이며 의료 진단·처방이 아닙니다.
+        </p>
+      </div>
+    );
+  }
+
+  const center = { lat, lng };
   const markers = [
     ...hospitals
       .filter((h) => isValidCoord(h.coordinates))
@@ -205,9 +254,9 @@ export default function TravelNearbyPage() {
         )}
       </section>
 
-      {isVegan && (
+      {plantBased && (
         <section className="space-y-2">
-          <h2 className="font-semibold">비건 식당</h2>
+          <h2 className="font-semibold">비건·채식 식당</h2>
           {veganRestaurants.length > 0 ? (
             veganRestaurants
               .filter((r) => {
@@ -223,7 +272,7 @@ export default function TravelNearbyPage() {
                 />
               ))
           ) : (
-            <p className="text-sm text-gray-500">주변 비건 식당 정보가 없습니다.</p>
+            <p className="text-sm text-gray-500">주변 비건·채식 식당 정보가 없습니다.</p>
           )}
         </section>
       )}
@@ -233,6 +282,10 @@ export default function TravelNearbyPage() {
           돌아가기
         </Button>
       </Link>
+
+      <p className="text-center text-xs text-gray-400">
+        안내 정보는 참고용이며 의료 진단·처방이 아닙니다.
+      </p>
     </div>
   );
 }

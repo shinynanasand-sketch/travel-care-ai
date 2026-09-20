@@ -78,7 +78,8 @@ export default function GuardianPage() {
       <h1 className="text-xl font-bold">보호자 설정</h1>
       <p className="text-sm text-gray-500">
         저혈당 등 위급 시 등록된 보호자 연락처를 안내합니다. 푸시 알림은 수신
-        기기 토큰이 등록된 경우에만 전송됩니다.
+        기기 토큰이 등록된 경우에만 전송됩니다. 본 안내는 참고용이며 의료
+        진단·처방이 아닙니다.
       </p>
 
       <Card>
@@ -159,11 +160,27 @@ export default function GuardianPage() {
                     ? '푸시 수신 기기 등록됨'
                     : '푸시 미등록 — 위급 시 전화 안내만 가능'}
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 h-8 text-xs text-red-600"
+                  onClick={() => {
+                    const next = guardians.filter((_, idx) => idx !== i);
+                    localStorage.setItem('guardians', JSON.stringify(next));
+                    setGuardians(next);
+                  }}
+                >
+                  삭제
+                </Button>
               </div>
             ))}
           </CardContent>
         </Card>
       )}
+
+      <p className="text-center text-xs text-gray-400">
+        안내·알림은 참고용이며 의료 진단·처방이 아닙니다.
+      </p>
     </div>
   );
 }

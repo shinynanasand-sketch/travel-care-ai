@@ -39,7 +39,7 @@ Travel Care AI는 한국관광공사 KorService2·무장애·웰니스 API를 �
 4) detailIntro2 — 음식점 대표·취급 메뉴 → Gemini 건강·비건 분석
 5) KorWithService2 detailWithTour2 — 무장애(휠체어·엘리베이터 등) → 일정 안전등급 보강
 6) WellnessTursmService locationBasedList — 사용자 취향('힐링') 및 해당 지역 내 데이터 존재 여부에 따른 조건부 웰니스 스팟 유연 배정 (데이터 부재 시 일반 명소로 자동 대체)
-7) 관광기상(/api/weather) — 고온다습 시 야외 일정 안내
+7) 관광기상(/api/weather) — 현재는 참고용 고정값(stub). 실연동 전 폭염 분기는 비활성
 
 부가: travelStyle(힐링·액티비티 등) 반영 Gemini 명소 선정,
 firstimage 있는 고화질 장소 우선 필터, 결과 화면 썸네일·대안 장소 제안,

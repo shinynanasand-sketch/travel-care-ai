@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BloodSugarInput } from '@/components/health/BloodSugarInput';
+import { BloodPressureInput } from '@/components/health/BloodPressureInput';
 import { AlertBanner } from '@/components/common/AlertBanner';
 import { MedicalSummaryModal } from '@/components/medical/MedicalSummaryModal';
 import { Button } from '@/components/ui/button';
@@ -15,13 +16,23 @@ import { useGeolocation } from '@/hooks/useGeolocation';
 import { getBloodSugarAlertConfig } from '@/lib/ai/bloodSugarAlert';
 import { requestFcmToken, subscribeForegroundMessages } from '@/lib/firebase';
 import { buildMedicalSummary } from '@/lib/medical/medicalSummary';
+import {
+  hasDiabetes,
+  hasHypertension,
+} from '@/lib/profile/healthConditions';
 
 export default function TravelPage() {
   const router = useRouter();
-  const { recordBloodSugar, assessment, latestBloodSugar } = useHealthMonitor();
+  const { recordBloodSugar, recordBloodPressure, assessment, latestBloodSugar } =
+    useHealthMonitor();
   const { userId, healthProfile, name } = useUserProfileStore();
   const { course } = useTravelPlanStore();
   const { lat, lng } = useGeolocation();
+  const showBloodSugar =
+    !healthProfile ||
+    hasDiabetes(healthProfile.conditions) ||
+    !hasHypertension(healthProfile.conditions);
+  const showBloodPressure = hasHypertension(healthProfile?.conditions);
   const [adjusting, setAdjusting] = useState(false);
   const [recordedMessage, setRecordedMessage] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
@@ -196,13 +207,6 @@ export default function TravelPage() {
     try {
       if (level !== 'NORMAL') {
         try {
-          const guardians = JSON.parse(
-            localStorage.getItem('guardians') ?? '[]'
-          ) as { fcmToken?: string }[];
-          const guardianFcmTokens = guardians
-            .map((g) => g.fcmToken)
-            .filter((t): t is string => Boolean(t?.trim()));
-
           const adjustRes = await fetch('/api/course/adjust', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -212,7 +216,6 @@ export default function TravelPage() {
               bloodSugar: value,
               conditions: healthProfile.conditions,
               currentLocation: lat && lng ? { lat, lng } : undefined,
-              guardianFcmTokens,
             }),
           });
 
@@ -236,11 +239,18 @@ export default function TravelPage() {
           }),
         });
 
-        const recordData = (await recordRes.json()) as { persisted?: boolean; dbError?: string };
+        const recordData = (await recordRes.json()) as {
+          persisted?: boolean;
+          dbError?: string;
+        };
         if (!recordRes.ok) {
           console.error('[travel] /api/health/record 실패:', recordData);
         } else if (recordData.persisted === false) {
-          console.error('[travel] /api/health/record DB 미저장 (데모 모드):', recordData.dbError);
+          showStatusToast('서버 DB 미연결 — 기록은 이 기기에만 저장되었습니다.');
+          console.error(
+            '[travel] /api/health/record DB 미저장 (데모 모드):',
+            recordData.dbError
+          );
         }
       } catch (error) {
         console.error('[travel] /api/health/record 예외 (데모 계속):', error);
@@ -261,6 +271,42 @@ export default function TravelPage() {
       sendHypoglycemiaNotify(value),
       persistHealthRecord(value, result.level),
     ]);
+  };
+
+  const handleBloodPressure = async (systolic: number, diastolic: number) => {
+    const result = recordBloodPressure(systolic, diastolic);
+    setRecordedMessage(
+      `혈압 ${systolic}/${diastolic} mmHg 기록되었습니다.`
+    );
+    setInputKey((k) => k + 1);
+
+    try {
+      const recordRes = await fetch('/api/health/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          recordType: 'BLOOD_PRESSURE',
+          value: systolic,
+          value2: diastolic,
+          travelPlanId: course?.courseId,
+        }),
+      });
+      const recordData = (await recordRes.json()) as {
+        persisted?: boolean;
+        dbError?: string;
+      };
+      if (recordRes.ok && recordData.persisted === false) {
+        showStatusToast('서버 DB 미연결 — 기록은 이 기기에만 저장되었습니다.');
+      }
+      if (result.level === 'DANGER') {
+        showStatusToast(
+          '혈압이 위험 구간입니다. 필요 시 119·의료기관에 문의하세요. (참고용)'
+        );
+      }
+    } catch (error) {
+      console.error('[travel] 혈압 기록 예외:', error);
+    }
   };
 
   const alertConfig = getBloodSugarAlertConfig(assessment, latestBloodSugar);
@@ -289,6 +335,45 @@ export default function TravelPage() {
       )}
 
       <h1 className="text-xl font-bold">여행 중 모니터링</h1>
+
+      {!course && (
+        <div
+          role="status"
+          className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-3 text-sm text-teal-900"
+        >
+          <p>아직 생성된 여행 코스가 없습니다. 모니터링은 가능합니다.</p>
+          <Button
+            variant="outline"
+            className="mt-2 w-full border-teal-300"
+            onClick={() => router.push('/plan')}
+          >
+            여행 코스 만들기
+          </Button>
+        </div>
+      )}
+
+      {course && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              진행 중 코스 · {course.days.length}일
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>
+              안전 점수 {course.overallSafetyScore}점
+              {course.hasVeganOptions ? ' · 비건·채식 옵션' : ''}
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push('/plan/result')}
+            >
+              코스 다시 보기
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {fcmSetupMessage && (
         <p className="text-xs text-gray-500">{fcmSetupMessage}</p>
@@ -332,26 +417,46 @@ export default function TravelPage() {
         summary={medicalSummary}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">혈당 기록</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BloodSugarInput
-            key={inputKey}
-            onSubmit={handleBloodSugar}
-            loading={adjusting}
-          />
-          {recordedMessage && (
-            <p className="mt-2 text-sm text-emerald-600">{recordedMessage}</p>
-          )}
-          {latestBloodSugar && !recordedMessage && (
-            <p className="mt-2 text-sm text-gray-500">
-              최근: {latestBloodSugar} mg/dL
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {showBloodSugar && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">혈당 기록</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BloodSugarInput
+              key={`bs-${inputKey}`}
+              onSubmit={handleBloodSugar}
+              loading={adjusting}
+            />
+            {recordedMessage && recordedMessage.includes('혈당') && (
+              <p className="mt-2 text-sm text-emerald-600">{recordedMessage}</p>
+            )}
+            {latestBloodSugar && !recordedMessage && (
+              <p className="mt-2 text-sm text-gray-500">
+                최근: {latestBloodSugar} mg/dL
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {showBloodPressure && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">혈압 기록</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BloodPressureInput
+              key={`bp-${inputKey}`}
+              onSubmit={handleBloodPressure}
+              loading={adjusting}
+            />
+            {recordedMessage && recordedMessage.includes('혈압') && (
+              <p className="mt-2 text-sm text-emerald-600">{recordedMessage}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Button
@@ -377,7 +482,7 @@ export default function TravelPage() {
       </Link>
 
       <p className="text-center text-xs text-gray-400">
-        AI 분석 및 알림은 참고용이며 의료 진단이 아닙니다.
+        AI 분석 및 알림은 참고용이며 의료 진단·처방이 아닙니다.
       </p>
     </div>
   );

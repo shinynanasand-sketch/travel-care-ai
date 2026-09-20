@@ -128,7 +128,7 @@ export default function PlanResultPage() {
         label="코스 의료(여행지·일정 좌표)"
       />
 
-      {hasCondition('VEGAN') && (
+      {hasCondition('VEGAN') || hasCondition('VEGETARIAN') ? (
         <label className="flex items-center gap-3 rounded-lg border p-3">
           <input
             type="checkbox"
@@ -136,9 +136,9 @@ export default function PlanResultPage() {
             onChange={(e) => setVeganFilter(e.target.checked)}
             className="h-5 w-5"
           />
-          <span className="text-base">🌱 비건 식당만 보기</span>
+          <span className="text-base">🌱 비건·채식 식당만 보기</span>
         </label>
-      )}
+      ) : null}
 
       {course.warnings.map((w, i) => (
         <Card key={i} className="border-yellow-200 bg-yellow-50">
@@ -165,29 +165,40 @@ export default function PlanResultPage() {
 
       <div className="space-y-2">
         <h2 className="font-semibold">주변 의료시설</h2>
-        {course.medicalFacilities.slice(0, 3).map((f) => (
-          <div key={f.name} className="rounded-lg border p-3 text-sm">
-            <p className="font-medium">
-              {f.type === 'HOSPITAL' ? '🏥' : '💊'} {f.name}
-              {f.distanceM != null ? ` — ${f.distanceM}m` : ''}
-              {f.source && f.source !== 'hira' ? (
-                <span className="ml-1 text-[10px] text-gray-500">
-                  ({f.source === 'kakao' ? '카카오' : '샘플'})
-                </span>
+        {course.medicalFacilities.length > 0 ? (
+          course.medicalFacilities.slice(0, 3).map((f) => (
+            <div key={f.name} className="rounded-lg border p-3 text-sm">
+              <p className="font-medium">
+                {f.type === 'HOSPITAL' ? '🏥' : '💊'} {f.name}
+                {f.distanceM != null ? ` — ${f.distanceM}m` : ''}
+                {f.source && f.source !== 'hira' ? (
+                  <span className="ml-1 text-[10px] text-gray-500">
+                    ({f.source === 'kakao' ? '카카오' : '샘플'})
+                  </span>
+                ) : null}
+              </p>
+              {f.address ? <p className="text-xs text-gray-600">{f.address}</p> : null}
+              {f.phone ? (
+                <a
+                  href={`tel:${f.phone.replace(/[^0-9+]/g, '')}`}
+                  className="text-xs text-blue-700"
+                >
+                  {f.phone}
+                </a>
               ) : null}
-            </p>
-            {f.address ? <p className="text-xs text-gray-600">{f.address}</p> : null}
-            {f.phone ? (
-              <a
-                href={`tel:${f.phone.replace(/[^0-9+]/g, '')}`}
-                className="text-xs text-blue-700"
-              >
-                {f.phone}
-              </a>
-            ) : null}
-          </div>
-        ))}
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500">
+            표시할 의료시설이 없습니다. 여행 중 「주변 시설」에서 GPS로 다시 확인할 수
+            있습니다.
+          </p>
+        )}
       </div>
+
+      <p className="text-xs text-gray-500">
+        코스에 쓰인 날씨 정보는 참고용 고정값일 수 있습니다. (실기상 연동 전)
+      </p>
 
       <Button className="w-full" onClick={() => router.push('/travel')}>
         여행 시작하기

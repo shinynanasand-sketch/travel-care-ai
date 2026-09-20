@@ -163,12 +163,28 @@ export function sanitizeVeganAnalysis(
 }
 
 function ruleBasedAnalysis(input: MenuAnalysisInput): MenuAnalysis {
-  const isVegan = input.conditions.includes('VEGAN');
+  const plantBased =
+    input.conditions.includes('VEGAN') ||
+    input.conditions.includes('VEGETARIAN');
+  const isHalal = input.conditions.includes('HALAL');
+  const hasAllergy = input.conditions.includes('FOOD_ALLERGY');
   const isDiabetes = input.conditions.some((c) => c.includes('DIABETES'));
   const menuText = `${input.firstmenu} ${input.treatmenu}`;
 
   const foundNonVegan = findKeywords(menuText, NON_VEGAN_KEYWORDS);
   const foundVegan = findKeywords(menuText, VEGAN_KEYWORDS);
+  const foundPorkAlcohol = findKeywords(menuText, [
+    '돼지',
+    '삼겹',
+    '족발',
+    '햄',
+    '베이컨',
+    '소시지',
+    '맥주',
+    '소주',
+    '와인',
+    '술',
+  ]);
 
   let veganFriendly: boolean | 'PARTIAL' = true;
   let veganLevel: VeganLevel = 'FULL_VEGAN';
@@ -179,7 +195,7 @@ function ruleBasedAnalysis(input: MenuAnalysisInput): MenuAnalysis {
   } else if (foundNonVegan.length > 0) {
     veganFriendly = false;
     veganLevel = 'NOT_VEGAN';
-  } else if (foundVegan.length === 0 && isVegan) {
+  } else if (foundVegan.length === 0 && plantBased) {
     veganFriendly = 'PARTIAL';
     veganLevel = 'CHECK_NEEDED';
   }
@@ -187,8 +203,34 @@ function ruleBasedAnalysis(input: MenuAnalysisInput): MenuAnalysis {
   const sugarRisk =
     menuText.includes('디저트') || menuText.includes('케이크') ? 'HIGH' : 'LOW';
 
+  const notes: string[] = [];
+  if (isHalal && foundPorkAlcohol.length > 0) {
+    notes.push(
+      `할랄 주의 가능 성분: ${foundPorkAlcohol.slice(0, 5).join(', ')}`
+    );
+  }
+  if (hasAllergy) {
+    notes.push('알레르기: 메뉴·원재료는 매장에 직접 확인해 주세요.');
+  }
+
+  let recommendation = plantBased
+    ? veganLevel === 'FULL_VEGAN'
+      ? '비건·채식 여행객에게 적합한 식당일 수 있습니다.'
+      : veganLevel === 'PARTIAL_VEGAN'
+        ? '일부 채식·비건 옵션이 있을 수 있습니다. 방문 전 확인해 주세요.'
+        : '채식·비건 옵션 확인이 필요합니다. 방문 전 전화 문의를 권장합니다.'
+    : '건강 상태에 맞게 식사량을 조절하세요.';
+
+  if (notes.length > 0) {
+    recommendation = `${recommendation} ${notes.join(' ')}`;
+  }
+
   return {
-    overallRisk: isDiabetes && sugarRisk === 'HIGH' ? 'HIGH' : 'LOW',
+    overallRisk:
+      (isDiabetes && sugarRisk === 'HIGH') ||
+      (isHalal && foundPorkAlcohol.length > 0)
+        ? 'HIGH'
+        : 'LOW',
     veganFriendly,
     veganItems: foundVegan.length > 0 ? foundVegan : ['확인 필요'],
     nonVeganIngredients: foundNonVegan,
@@ -201,13 +243,7 @@ function ruleBasedAnalysis(input: MenuAnalysisInput): MenuAnalysis {
         veganOk: veganLevel === 'FULL_VEGAN' || veganLevel === 'PARTIAL_VEGAN',
       },
     ],
-    recommendation: isVegan
-      ? veganLevel === 'FULL_VEGAN'
-        ? '비건 여행객에게 적합한 식당입니다.'
-        : veganLevel === 'PARTIAL_VEGAN'
-          ? '일부 비건 옵션이 있을 수 있습니다. 방문 전 확인해 주세요.'
-          : '비건 옵션 확인이 필요합니다. 방문 전 전화 문의를 권장합니다.'
-      : '건강 상태에 맞게 식사량을 조절하세요.',
+    recommendation,
     alternatives: ['샐러드', '두부 요리', '현미밥'],
     postMealAdvice: isDiabetes
       ? '식후 30분 가벼운 산책을 권장합니다.'
@@ -352,14 +388,20 @@ export async function analyzeMenuForHealth(
     return result;
   }
 
-  const isVegan = input.conditions.includes('VEGAN');
+  const plantBased =
+    input.conditions.includes('VEGAN') ||
+    input.conditions.includes('VEGETARIAN');
+  const isHalal = input.conditions.includes('HALAL');
+  const hasAllergy = input.conditions.includes('FOOD_ALLERGY');
   const isDiabetes = input.conditions.some((c) => c.includes('DIABETES'));
 
-  const prompt = `당신은 식이 제한 전문 AI입니다. 참고용 분석만 제공하세요.
+  const prompt = `당신은 식이 제한 전문 AI입니다. 참고용 분석만 제공하세요. 의료 진단·처방이 아닙니다.
 
 [사용자 조건]
 ${isDiabetes ? '- 당뇨: 당질·혈당지수 분석 필요' : ''}
-${isVegan ? '- 비건: 동물성 성분 완전 제외 필요' : ''}
+${plantBased ? '- 비건/채식: 동물성 성분 확인 필요' : ''}
+${isHalal ? '- 할랄: 돼지·알코올 등 비할랄 성분 확인' : ''}
+${hasAllergy ? '- 식품 알레르기: 원재료 확인 필요(확실하지 않으면 경고)' : ''}
 
 [분석 메뉴]
 대표: ${input.firstmenu}
@@ -369,6 +411,7 @@ ${isVegan ? '- 비건: 동물성 성분 완전 제외 필요' : ''}
 - 스테이크·고기·치킨·해산물 등이 대표/취급에 있으면 veganFriendly는 true가 될 수 없음.
 - 동물성+채소가 섞이면 veganFriendly는 "PARTIAL".
 - 완전 비건 전문일 때만 veganFriendly true.
+- 할랄/알레르기는 recommendation에 주의 문구를 포함.
 
 JSON으로만 응답:
 {

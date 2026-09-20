@@ -205,7 +205,9 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   const sigunguName = sigunguCode
     ? getSigungu(destination.areaCode, sigunguCode)?.name
     : undefined;
-  const isVegan = healthProfile.conditions.includes('VEGAN');
+  const isVegan =
+    healthProfile.conditions.includes('VEGAN') ||
+    healthProfile.conditions.includes('VEGETARIAN');
   const profileMode = getCourseProfileMode(healthProfile.conditions);
   const isHealthFocused = profileMode === 'health';
   const placeLabel = destination.name || region.name;
@@ -545,7 +547,10 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
 
   const days: DayCourse[] = [];
   let hasVeganOptions = false;
-  const isHot = weather.temperature > 30 && weather.humidity > 80;
+  const isHot =
+    weather.source === 'live' &&
+    weather.temperature > 30 &&
+    weather.humidity > 80;
 
   for (let d = 0; d < period.days; d++) {
     const date = format(addDays(new Date(period.startDate), d), 'yyyy-MM-dd');

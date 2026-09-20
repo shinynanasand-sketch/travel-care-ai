@@ -82,7 +82,8 @@ async function swapPlace(
 
   const exclude = usedContentIds(days, contentId);
   const { lat, lng } = current.coordinates;
-  const isVegan = conditions.includes('VEGAN');
+  const isVegan =
+    conditions.includes('VEGAN') || conditions.includes('VEGETARIAN');
   const sigunguName = sigunguCode
     ? getSigungu(areaCode, sigunguCode)?.name
     : undefined;

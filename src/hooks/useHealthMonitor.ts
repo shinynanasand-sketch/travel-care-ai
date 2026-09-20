@@ -19,10 +19,28 @@ export function useHealthMonitor() {
     return assessment;
   };
 
+  const recordBloodPressure = (systolic: number, diastolic: number) => {
+    const alertLevel =
+      systolic >= 180 || diastolic >= 120
+        ? 'DANGER'
+        : systolic >= 140 || diastolic >= 90
+          ? 'WARNING'
+          : 'NORMAL';
+    addRecord({
+      recordType: 'BLOOD_PRESSURE',
+      value: systolic,
+      value2: diastolic,
+      alertLevel,
+      recordedAt: new Date().toISOString(),
+    });
+    return { level: alertLevel };
+  };
+
   return {
     records,
     latestBloodSugar,
     recordBloodSugar,
+    recordBloodPressure,
     assessment: latestBloodSugar
       ? assessBloodSugar(latestBloodSugar)
       : null,
