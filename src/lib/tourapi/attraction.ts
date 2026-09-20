@@ -39,7 +39,7 @@ export async function getAttractionsByArea(
         arrange: 'O',
       },
     });
-    let items = parseTourResponse<AttractionItem>(data);
+    const items = parseTourResponse<AttractionItem>(data);
 
     // 구 지정 시 시 전체로 확대하지 않음 — 타 구 혼입·잘못된 캐시 방지
     if (items.length === 0) return [];
@@ -80,7 +80,7 @@ export async function getCulturalFacilitiesByArea(
         arrange: 'O',
       },
     });
-    let items = parseTourResponse<AttractionItem>(data);
+    const items = parseTourResponse<AttractionItem>(data);
 
     // 구 지정 시 시 전체로 확대하지 않음
     if (items.length > 0) {
