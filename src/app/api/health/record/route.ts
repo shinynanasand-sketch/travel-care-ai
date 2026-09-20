@@ -1,10 +1,19 @@
 import { assessBloodSugar } from '@/lib/ai/healthAdvisor';
 import { db } from '@/lib/db';
 import { errorResponse } from '@/lib/utils/api-error';
+import {
+  enforceOptionalApiSecret,
+  enforceRateLimit,
+} from '@/lib/utils/rateLimit';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as {
+    const secretBlock = enforceOptionalApiSecret(request);
+    if (secretBlock) return secretBlock;
+    const limited = enforceRateLimit(request, 'health-record', 30, 60_000);
+    if (limited) return limited;
+
+    const body = (await request.json()) as {
       userId: string;
       recordType: 'BLOOD_SUGAR' | 'BLOOD_PRESSURE';
       value: number;

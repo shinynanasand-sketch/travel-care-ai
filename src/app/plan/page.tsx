@@ -20,6 +20,7 @@ import {
 import { useUserProfileStore } from '@/store/userProfileStore';
 import { useTravelPlanStore } from '@/store/travelPlanStore';
 import { useCourseGenerate } from '@/hooks/useCourseGenerate';
+import { hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 import { TRAVEL_STYLES, type TravelStyle } from '@/types/course.types';
 
 /** Empty string = 시·도 전체 (광역시 기본) */
@@ -37,7 +38,7 @@ const GENERATE_LOADING_STEPS = [
 export default function PlanPage() {
   const router = useRouter();
   const { userId, healthProfile } = useUserProfileStore();
-  const { setCourse, setDestination, setPeriod, setLastRequest } =
+  const { setCourse, setDestination, setPeriod, setLastRequest, course, destination } =
     useTravelPlanStore();
   const generate = useCourseGenerate();
 
@@ -135,10 +136,10 @@ export default function PlanPage() {
     }
   };
 
-  if (!healthProfile) {
+  if (!healthProfile || !hasHealthOrDietConditions(healthProfile.conditions)) {
     return (
       <div className="space-y-4 text-center">
-        <p>맞춤 코스를 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <p>맞춤 코스를 위해 질환·식이 조건을 하나 이상 선택해 주세요.</p>
         <Button onClick={() => router.push('/profile?next=/plan')}>
           프로필 등록
         </Button>
@@ -149,6 +150,26 @@ export default function PlanPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold">여행 계획</h1>
+
+      {course && (
+        <div
+          role="status"
+          className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-3 text-sm text-teal-900"
+        >
+          <p>
+            저장된 코스가 있습니다
+            {destination?.name ? ` (${destination.name})` : ''}.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full border-teal-300"
+            onClick={() => router.push('/plan/result')}
+          >
+            저장된 코스 보기
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

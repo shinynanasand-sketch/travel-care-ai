@@ -3,6 +3,10 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { isFcmConfigured } from '@/lib/notification/firebase';
 import { errorResponse } from '@/lib/utils/api-error';
+import {
+  enforceOptionalApiSecret,
+  enforceRateLimit,
+} from '@/lib/utils/rateLimit';
 
 const ALERT_TITLE = '저혈당 위험 알림';
 const ALERT_BODY = '현재 혈당이 위험 수치입니다!';
@@ -51,6 +55,11 @@ function extractFirebaseError(error: unknown) {
 
 export async function POST(request: Request) {
   try {
+    const secretBlock = enforceOptionalApiSecret(request);
+    if (secretBlock) return secretBlock;
+    const limited = enforceRateLimit(request, 'notify', 10, 60_000);
+    if (limited) return limited;
+
     const body = (await request.json()) as {
       token?: string;
       bloodSugar?: number;
@@ -69,13 +78,20 @@ export async function POST(request: Request) {
     if (!token) {
       console.error(`${FCM_SERVER_PREFIX} ❌ missing_token`);
       return Response.json(
-        { sent: false, mode: 'error', reason: 'missing_token', errorMessage: 'token is required' },
+        {
+          sent: false,
+          mode: 'error',
+          reason: 'missing_token',
+          errorMessage: 'token is required',
+        },
         { status: 400 }
       );
     }
 
     if (typeof bloodSugar !== 'number' || Number.isNaN(bloodSugar)) {
-      console.error(`${FCM_SERVER_PREFIX} ❌ invalid_blood_sugar`, { bloodSugar });
+      console.error(`${FCM_SERVER_PREFIX} ❌ invalid_blood_sugar`, {
+        bloodSugar,
+      });
       return Response.json(
         {
           sent: false,
@@ -88,7 +104,9 @@ export async function POST(request: Request) {
     }
 
     if (bloodSugar >= 70) {
-      console.log(`${FCM_SERVER_PREFIX} ⏭️ blood_sugar_not_critical`, { bloodSugar });
+      console.log(`${FCM_SERVER_PREFIX} ⏭️ blood_sugar_not_critical`, {
+        bloodSugar,
+      });
       return Response.json({
         sent: false,
         mode: 'skipped',
@@ -129,7 +147,10 @@ export async function POST(request: Request) {
         notification: { title: ALERT_TITLE, body: ALERT_BODY },
       });
 
-      console.log(`${FCM_SERVER_PREFIX} ✅ send() 성공`, { messageId, bloodSugar });
+      console.log(`${FCM_SERVER_PREFIX} ✅ send() 성공`, {
+        messageId,
+        bloodSugar,
+      });
 
       return Response.json({
         sent: true,

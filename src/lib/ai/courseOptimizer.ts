@@ -176,8 +176,7 @@ function buildCourseAlternatives(
     if (out.length >= limit || selectedIds.has(item.contentid) || seen.has(item.contentid)) {
       return;
     }
-    const imageUrl = pickTourImageUrl(item);
-    if (!imageUrl) return;
+    const imageUrl = pickTourImageUrl(item) || '';
     seen.add(item.contentid);
     out.push({
       contentId: item.contentid,

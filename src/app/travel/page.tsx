@@ -12,13 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useHealthMonitor } from '@/hooks/useHealthMonitor';
 import { useUserProfileStore } from '@/store/userProfileStore';
 import { useTravelPlanStore } from '@/store/travelPlanStore';
-import { useGeolocation } from '@/hooks/useGeolocation';
 import { getBloodSugarAlertConfig } from '@/lib/ai/bloodSugarAlert';
 import { requestFcmToken, subscribeForegroundMessages } from '@/lib/firebase';
 import { buildMedicalSummary } from '@/lib/medical/medicalSummary';
 import {
   hasDiabetes,
   hasHypertension,
+  hasHealthOrDietConditions,
 } from '@/lib/profile/healthConditions';
 
 export default function TravelPage() {
@@ -26,8 +26,7 @@ export default function TravelPage() {
   const { recordBloodSugar, recordBloodPressure, assessment, latestBloodSugar } =
     useHealthMonitor();
   const { userId, healthProfile, name } = useUserProfileStore();
-  const { course } = useTravelPlanStore();
-  const { lat, lng } = useGeolocation();
+  const { course, destination } = useTravelPlanStore();
   const showBloodSugar =
     !healthProfile ||
     hasDiabetes(healthProfile.conditions) ||
@@ -41,6 +40,8 @@ export default function TravelPage() {
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [fcmSetupMessage, setFcmSetupMessage] = useState<string | null>(null);
   const [hypoNearbyCta, setHypoNearbyCta] = useState(false);
+  const lastHypoNotifyAtRef = useRef<number>(0);
+  const HYPO_NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;
   const guardianToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -133,6 +134,14 @@ export default function TravelPage() {
   const sendHypoglycemiaNotify = async (value: number) => {
     if (value >= 70) return;
 
+    const now = Date.now();
+    if (now - lastHypoNotifyAtRef.current < HYPO_NOTIFY_COOLDOWN_MS) {
+      showStatusToast(
+        '저혈당 알림은 잠시 전에 보냈습니다. 필요하면 주변 약국·병원을 확인해 주세요.'
+      );
+      return;
+    }
+
     const guardians = loadGuardians();
     const guardianTokens = guardians
       .map((g) => g.fcmToken?.trim())
@@ -194,6 +203,7 @@ export default function TravelPage() {
     }
 
     if (anySent) {
+      lastHypoNotifyAtRef.current = now;
       showStatusToast(
         usedGuardianToken
           ? '등록된 보호자 기기로 긴급 알림을 전송했습니다.'
@@ -215,27 +225,8 @@ export default function TravelPage() {
 
     setAdjusting(true);
     try {
-      if (level !== 'NORMAL') {
-        try {
-          const adjustRes = await fetch('/api/course/adjust', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              courseId: course?.courseId,
-              userId,
-              bloodSugar: value,
-              conditions: healthProfile.conditions,
-              currentLocation: lat && lng ? { lat, lng } : undefined,
-            }),
-          });
-
-          if (!adjustRes.ok) {
-            console.error('[travel] /api/course/adjust 실패:', await adjustRes.text());
-          }
-        } catch (error) {
-          console.error('[travel] /api/course/adjust 예외 (데모 계속):', error);
-        }
-      }
+      // 코스 재조정 API는 호출하지 않음 — 저혈당 CTA·FCM은 클라이언트에서 처리
+      void level;
 
       try {
         const recordRes = await fetch('/api/health/record', {
@@ -321,10 +312,10 @@ export default function TravelPage() {
 
   const alertConfig = getBloodSugarAlertConfig(assessment, latestBloodSugar);
 
-  if (!healthProfile) {
+  if (!healthProfile || !hasHealthOrDietConditions(healthProfile.conditions)) {
     return (
       <div className="space-y-4 text-center">
-        <p>건강 모니터링을 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <p>건강 모니터링을 위해 질환·식이 조건을 하나 이상 선택해 주세요.</p>
         <Button onClick={() => router.push('/profile?next=/travel')}>
           프로필 등록
         </Button>
@@ -366,7 +357,9 @@ export default function TravelPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              진행 중 코스 · {course.days.length}일
+              진행 중 코스
+              {destination?.name ? ` · ${destination.name}` : ''} ·{' '}
+              {course.days.length}일
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-gray-600">

@@ -24,7 +24,7 @@ const LEVEL_STYLE: Record<
 > = {
   HIGH: { label: '무장애 우수', className: 'bg-emerald-100 text-emerald-700' },
   MEDIUM: { label: '무장애 보통', className: 'bg-amber-100 text-amber-700' },
-  LOW: { label: '무장애 정보 부족', className: 'bg-rose-100 text-rose-700' },
+  LOW: { label: '무장애 샘플·확인 필요', className: 'bg-rose-100 text-rose-700' },
 };
 
 function isAvailable(value?: string): boolean {

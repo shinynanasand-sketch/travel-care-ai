@@ -376,7 +376,13 @@ export async function quickVeganScore(
 export async function analyzeMenuForHealth(
   input: MenuAnalysisInput
 ): Promise<MenuAnalysis> {
-  const cacheKey = buildCacheKey('ai', 'menuAnalysis', { ...input, v: 2 });
+  const cacheKey = buildCacheKey('ai', 'menuAnalysis', {
+    firstmenu: input.firstmenu,
+    treatmenu: input.treatmenu,
+    // 조건은 캐시 키에 넣지 않음 — 로컬 규칙으로 응답만 합성
+    cond: [...input.conditions].sort().join(','),
+    v: 3,
+  });
   const cached = await getCached<MenuAnalysis>(cacheKey);
   if (cached) return cached;
 
@@ -388,20 +394,8 @@ export async function analyzeMenuForHealth(
     return result;
   }
 
-  const plantBased =
-    input.conditions.includes('VEGAN') ||
-    input.conditions.includes('VEGETARIAN');
-  const isHalal = input.conditions.includes('HALAL');
-  const hasAllergy = input.conditions.includes('FOOD_ALLERGY');
-  const isDiabetes = input.conditions.some((c) => c.includes('DIABETES'));
-
-  const prompt = `당신은 식이 제한 전문 AI입니다. 참고용 분석만 제공하세요. 의료 진단·처방이 아닙니다.
-
-[사용자 조건]
-${isDiabetes ? '- 당뇨: 당질·혈당지수 분석 필요' : ''}
-${plantBased ? '- 비건/채식: 동물성 성분 확인 필요' : ''}
-${isHalal ? '- 할랄: 돼지·알코올 등 비할랄 성분 확인' : ''}
-${hasAllergy ? '- 식품 알레르기: 원재료 확인 필요(확실하지 않으면 경고)' : ''}
+  const prompt = `당신은 메뉴 텍스트만 보고 참고용 식이 분석을 합니다. 의료 진단·처방이 아닙니다.
+개인 건강·질환 정보는 받지 마세요. 메뉴에 동물성·당·나트륨 관련 단서만 추론하세요.
 
 [분석 메뉴]
 대표: ${input.firstmenu}
@@ -411,7 +405,8 @@ ${hasAllergy ? '- 식품 알레르기: 원재료 확인 필요(확실하지 않�
 - 스테이크·고기·치킨·해산물 등이 대표/취급에 있으면 veganFriendly는 true가 될 수 없음.
 - 동물성+채소가 섞이면 veganFriendly는 "PARTIAL".
 - 완전 비건 전문일 때만 veganFriendly true.
-- 할랄/알레르기는 recommendation에 주의 문구를 포함.
+- 돼지·알코올 단서가 있으면 recommendation에 할랄 주의 가능을 적을 수 있음.
+- 알레르기 원재료는 확실하지 않으면 "확인 필요"로 안내.
 
 JSON으로만 응답:
 {
@@ -429,9 +424,28 @@ JSON으로만 응답:
     const result = await geminiFlash.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(text) as MenuAnalysis;
-    const sanitized = sanitizeVeganAnalysis(menuBlob, parsed);
-    await setCache(cacheKey, sanitized, CACHE_TTL.aiAnalysis);
-    return sanitized;
+    // 질환·식이 조건은 로컬 규칙으로만 반영 (규칙 5)
+    const merged = sanitizeVeganAnalysis(
+      menuBlob,
+      {
+        ...parsed,
+        ...(() => {
+          const local = ruleBasedAnalysis(input);
+          return {
+            overallRisk:
+              local.overallRisk === 'HIGH' || parsed.overallRisk === 'HIGH'
+                ? 'HIGH'
+                : parsed.overallRisk,
+            recommendation: [parsed.recommendation, local.recommendation]
+              .filter(Boolean)
+              .join(' '),
+            postMealAdvice: local.postMealAdvice || parsed.postMealAdvice,
+          };
+        })(),
+      }
+    );
+    await setCache(cacheKey, merged, CACHE_TTL.aiAnalysis);
+    return merged;
   } catch {
     const fallback = sanitizeVeganAnalysis(menuBlob, ruleBasedAnalysis(input));
     await setCache(cacheKey, fallback, CACHE_TTL.aiAnalysis);

@@ -8,6 +8,7 @@ import { useHealthStore } from '@/store/healthStore';
 import { useHealthStoreHydrated } from '@/hooks/useHealthStoreHydrated';
 import { useUserProfileStore } from '@/store/userProfileStore';
 import { useUserProfileHydrated } from '@/hooks/useUserProfileHydrated';
+import { hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 
 export default function TravelHealthPage() {
   const router = useRouter();
@@ -17,10 +18,10 @@ export default function TravelHealthPage() {
   const records = useHealthStore((s) => s.records);
   const bloodSugarRecords = records.filter((r) => r.recordType === 'BLOOD_SUGAR');
 
-  if (profileHydrated && !healthProfile) {
+  if (profileHydrated && !hasHealthOrDietConditions(healthProfile?.conditions)) {
     return (
       <div className="space-y-4 text-center">
-        <p>건강 기록을 보려면 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <p>건강 기록을 보려면 질환·식이 조건을 하나 이상 선택해 주세요.</p>
         <Button onClick={() => router.push('/profile?next=/travel/health')}>
           프로필 등록
         </Button>

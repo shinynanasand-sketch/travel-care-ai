@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode, MouseEvent } from 'react';
 import { useUserProfileStore } from '@/store/userProfileStore';
 import { useUserProfileHydrated } from '@/hooks/useUserProfileHydrated';
+import { hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 import { cn } from '@/lib/utils/cn';
 
 type ProfileGateLinkProps = {
@@ -16,8 +17,7 @@ type ProfileGateLinkProps = {
 };
 
 /**
- * 건강 프로필이 없으면 보호된 경로 대신 프로필 등록으로 안내한다.
- * persist 재수화 전에는 원래 href로 두고, 대상 페이지 가드가 최종 안전망.
+ * 질환·식이 조건이 하나라도 없으면 보호된 경로 대신 프로필 등록으로 안내한다.
  */
 export function ProfileGateLink({
   href = '/plan',
@@ -29,10 +29,11 @@ export function ProfileGateLink({
   const hydrated = useUserProfileHydrated();
   const healthProfile = useUserProfileStore((s) => s.healthProfile);
   const resolvedProfileHref = profileHref ?? `/profile?next=${href}`;
+  const ready = hasHealthOrDietConditions(healthProfile?.conditions);
 
   const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (!hydrated) return;
-    if (healthProfile) return;
+    if (ready) return;
     e.preventDefault();
     router.push(resolvedProfileHref);
   };

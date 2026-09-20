@@ -97,19 +97,22 @@ export async function getAccessibilityInfo(
   }
 }
 
-/** 로컬·mock 전용 — TourAPI 미설정일 때만 사용 */
+/** 로컬·mock 전용 — TourAPI 미설정일 때만 사용. HIGH로 과장하지 않음. */
 function getMockAccessibility(contentId: string): AccessibilityInfo {
   const base = {
     contentid: contentId,
-    wheelchair: '대여 가능',
-    elevator: '있음',
-    restroom: '장애인 전용 화장실 있음',
-    route: '완만한 경사로',
-    parking: '장애인 전용 주차구역 있음',
-    exit: '주출입구 단차 없음 (휠체어 접근 가능)',
-    publictransport: '대중교통 접근 가능',
-    braileblock: '점자블록 설치',
-    audioguide: '오디오 가이드 제공',
+    wheelchair: '샘플·확인 필요',
+    elevator: undefined,
+    restroom: undefined,
+    route: undefined,
+    parking: undefined,
+    exit: undefined,
+    publictransport: undefined,
+    braileblock: undefined,
+    audioguide: undefined,
   };
-  return { ...base, level: computeAccessibilityLevel(base) };
+  return {
+    ...base,
+    level: 'LOW',
+  };
 }

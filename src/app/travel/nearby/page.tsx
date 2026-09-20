@@ -17,7 +17,7 @@ import { useUserProfileStore } from '@/store/userProfileStore';
 import { buildMedicalSummary } from '@/lib/medical/medicalSummary';
 import { isValidCoord } from '@/lib/geo/distance';
 import { tourCoords } from '@/lib/tourapi/client';
-import { wantsPlantBasedDining } from '@/lib/profile/healthConditions';
+import { wantsPlantBasedDining, hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 import type { MedicalFacility, MedicalLookupMeta } from '@/types/medical.types';
 import type { TourApiItem } from '@/types/tourapi.types';
 import { useRouter } from 'next/navigation';
@@ -56,6 +56,7 @@ export default function TravelNearbyPage() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [hospitals, setHospitals] = useState<MedicalFacility[]>([]);
   const [pharmacies, setPharmacies] = useState<MedicalFacility[]>([]);
+  const [emergencies, setEmergencies] = useState<MedicalFacility[]>([]);
   const [veganRestaurants, setVeganRestaurants] = useState<TourApiItem[]>([]);
   const [medicalMeta, setMedicalMeta] = useState<MedicalLookupMeta | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -74,15 +75,17 @@ export default function TravelNearbyPage() {
       fetch(`/api/medical/pharmacy?lat=${lat}&lng=${lng}&radius=2000`).then((r) =>
         r.json()
       ),
+      fetch(`/api/medical/emergency?lat=${lat}&lng=${lng}`).then((r) => r.json()),
       plantBased
         ? fetch(`/api/restaurant/list?lat=${lat}&lng=${lng}&vegan=true`).then((r) =>
             r.json()
           )
         : Promise.resolve({ restaurants: [] }),
     ])
-      .then(([h, p, v]) => {
+      .then(([h, p, e, v]) => {
         setHospitals(h.hospitals ?? []);
         setPharmacies(p.pharmacies ?? []);
+        setEmergencies(e.emergency ?? []);
         setVeganRestaurants(v.restaurants ?? []);
         setMedicalMeta(mergeMeta(h.meta, p.meta));
       })
@@ -97,10 +100,10 @@ export default function TravelNearbyPage() {
     [name, healthProfile, latestBloodSugar]
   );
 
-  if (hydrated && !healthProfile) {
+  if (hydrated && !hasHealthOrDietConditions(healthProfile?.conditions)) {
     return (
       <div className="space-y-4 text-center">
-        <p>주변 시설 안내를 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <p>주변 시설 안내를 위해 질환·식이 조건을 하나 이상 선택해 주세요.</p>
         <Button onClick={() => router.push('/profile?next=/travel/nearby')}>
           프로필 등록
         </Button>
@@ -157,6 +160,14 @@ export default function TravelNearbyPage() {
         lat: p.coordinates.lat,
         lng: p.coordinates.lng,
         title: p.name,
+        type: 'medical' as const,
+      })),
+    ...emergencies
+      .filter((e) => isValidCoord(e.coordinates))
+      .map((e) => ({
+        lat: e.coordinates.lat,
+        lng: e.coordinates.lng,
+        title: e.name,
         type: 'medical' as const,
       })),
     ...veganRestaurants.flatMap((r) => {
@@ -250,6 +261,26 @@ export default function TravelNearbyPage() {
         ) : (
           <p className="text-sm text-gray-500">
             {fetching ? '불러오는 중...' : '주변 약국 정보가 없습니다.'}
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">응급·응급실</h2>
+        {emergencies.length > 0 ? (
+          emergencies.slice(0, 3).map((e, i) => (
+            <MedicalMarker
+              key={`${e.name}-${i}`}
+              name={e.name}
+              type="HOSPITAL"
+              distanceM={e.distanceM}
+              address={e.address}
+              phone={e.phone}
+            />
+          ))
+        ) : (
+          <p className="text-sm text-gray-500">
+            {fetching ? '불러오는 중...' : '주변 응급 시설 정보가 없습니다.'}
           </p>
         )}
       </section>

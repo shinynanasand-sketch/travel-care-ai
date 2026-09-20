@@ -7,12 +7,14 @@ import { ProfileGateLink } from '@/components/common/ProfileGateLink';
 import { useUserProfileStore } from '@/store/userProfileStore';
 import { useUserProfileHydrated } from '@/hooks/useUserProfileHydrated';
 import { useTravelPlanStore } from '@/store/travelPlanStore';
+import { hasHealthOrDietConditions } from '@/lib/profile/healthConditions';
 
 export default function HomePage() {
   const hydrated = useUserProfileHydrated();
   const healthProfile = useUserProfileStore((s) => s.healthProfile);
   const course = useTravelPlanStore((s) => s.course);
-  const hasProfile = hydrated && Boolean(healthProfile);
+  const hasProfile =
+    hydrated && hasHealthOrDietConditions(healthProfile?.conditions);
   const hasCourse = hydrated && Boolean(course);
 
   return (
