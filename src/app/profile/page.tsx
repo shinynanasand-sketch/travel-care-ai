@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DietSelector } from '@/components/health/DietSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,17 @@ import {
 import { resetLocalData } from '@/lib/profile/resetLocalData';
 import type { ConditionType, ActivityLevel } from '@/types/health.types';
 
-export default function ProfilePage() {
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/plan';
+  return raw;
+}
+
+function ProfileForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextRaw = searchParams.get('next');
+  const nextPath = safeNextPath(nextRaw);
+  const fromPlan = nextRaw === '/plan';
   const { healthProfile, setHealthProfile, setName, name } = useUserProfileStore();
   const [conditions, setConditions] = useState<ConditionType[]>(
     healthProfile?.conditions ?? []
@@ -65,7 +74,7 @@ export default function ProfilePage() {
         .filter(Boolean),
     });
 
-    router.push('/plan');
+    router.push(nextPath);
   };
 
   const handleReset = () => {
@@ -89,6 +98,15 @@ export default function ProfilePage() {
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
       <h1 className="text-xl font-bold">건강·식이 프로필</h1>
+
+      {fromPlan && (
+        <div
+          role="status"
+          className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"
+        >
+          맞춤 코스를 만들려면 건강·식이 프로필을 먼저 등록해 주세요.
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -169,5 +187,20 @@ export default function ProfilePage() {
         데이터 초기화
       </Button>
     </form>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <h1 className="text-xl font-bold">건강·식이 프로필</h1>
+          <p className="text-sm text-gray-500">불러오는 중…</p>
+        </div>
+      }
+    >
+      <ProfileForm />
+    </Suspense>
   );
 }

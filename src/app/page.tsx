@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProfileGateLink } from '@/components/common/ProfileGateLink';
 
 export default function HomePage() {
   return (
@@ -40,11 +41,11 @@ export default function HomePage() {
             1. 건강·식이 프로필 등록
           </Button>
         </Link>
-        <Link href="/plan">
+        <ProfileGateLink href="/plan" className="block w-full">
           <Button variant="outline" className="w-full" size="lg">
             2. 여행 코스 만들기
           </Button>
-        </Link>
+        </ProfileGateLink>
         <Link href="/travel">
           <Button variant="outline" className="w-full" size="lg">
             3. 여행 중 건강 모니터링

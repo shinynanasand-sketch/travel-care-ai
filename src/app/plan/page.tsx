@@ -92,7 +92,7 @@ export default function PlanPage() {
 
   const handleGenerate = async () => {
     if (!healthProfile) {
-      router.push('/profile');
+      router.push('/profile?next=/plan');
       return;
     }
     if (!isMetro && !sigunguCode) {
@@ -138,8 +138,10 @@ export default function PlanPage() {
   if (!healthProfile) {
     return (
       <div className="space-y-4 text-center">
-        <p>먼저 건강 프로필을 등록해 주세요.</p>
-        <Button onClick={() => router.push('/profile')}>프로필 등록</Button>
+        <p>맞춤 코스를 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <Button onClick={() => router.push('/profile?next=/plan')}>
+          프로필 등록
+        </Button>
       </div>
     );
   }
