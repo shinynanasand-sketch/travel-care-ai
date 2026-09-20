@@ -56,7 +56,7 @@ export default function PlanResultPage() {
               days: course.days.length,
             },
             healthProfile,
-            travelStyle: lastRequest?.travelStyle ?? '힐링',
+            travelStyle: '힐링',
           }
         : null);
 
