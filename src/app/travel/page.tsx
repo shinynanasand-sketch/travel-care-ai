@@ -265,6 +265,17 @@ export default function TravelPage() {
 
   const alertConfig = getBloodSugarAlertConfig(assessment, latestBloodSugar);
 
+  if (!healthProfile) {
+    return (
+      <div className="space-y-4 text-center">
+        <p>건강 모니터링을 위해 건강·식이 프로필을 먼저 등록해 주세요.</p>
+        <Button onClick={() => router.push('/profile?next=/travel')}>
+          프로필 등록
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {guardianToast && (

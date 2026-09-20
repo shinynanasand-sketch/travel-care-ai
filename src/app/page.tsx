@@ -46,11 +46,11 @@ export default function HomePage() {
             2. 여행 코스 만들기
           </Button>
         </ProfileGateLink>
-        <Link href="/travel">
+        <ProfileGateLink href="/travel" className="block w-full">
           <Button variant="outline" className="w-full" size="lg">
             3. 여행 중 건강 모니터링
           </Button>
-        </Link>
+        </ProfileGateLink>
       </div>
     </div>
   );

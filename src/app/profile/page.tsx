@@ -25,6 +25,7 @@ function ProfileForm() {
   const nextRaw = searchParams.get('next');
   const nextPath = safeNextPath(nextRaw);
   const fromPlan = nextRaw === '/plan';
+  const fromTravel = nextRaw === '/travel';
   const { healthProfile, setHealthProfile, setName, name } = useUserProfileStore();
   const [conditions, setConditions] = useState<ConditionType[]>(
     healthProfile?.conditions ?? []
@@ -105,6 +106,15 @@ function ProfileForm() {
           className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"
         >
           맞춤 코스를 만들려면 건강·식이 프로필을 먼저 등록해 주세요.
+        </div>
+      )}
+
+      {fromTravel && (
+        <div
+          role="status"
+          className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"
+        >
+          건강 모니터링을 시작하려면 건강·식이 프로필을 먼저 등록해 주세요.
         </div>
       )}
 

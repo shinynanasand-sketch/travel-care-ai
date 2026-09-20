@@ -8,7 +8,7 @@ import { ProfileGateLink } from '@/components/common/ProfileGateLink';
 const navItems = [
   { href: '/', label: '홈', icon: '🏠', gate: false },
   { href: '/plan', label: '코스', icon: '🗺️', gate: true },
-  { href: '/travel', label: '여행중', icon: '📍', gate: false },
+  { href: '/travel', label: '여행중', icon: '📍', gate: true },
   { href: '/profile', label: '프로필', icon: '👤', gate: false },
 ] as const;
 
