@@ -49,6 +49,7 @@ export const useTravelPlanStore = create<TravelPlanState>()(
           destination: null,
           period: null,
           lastRequest: null,
+          veganFilter: false,
         }),
     }),
     { name: 'travel-care-plan' }

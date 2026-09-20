@@ -11,6 +11,7 @@ import {
   loadUserProfileFromStorage,
   saveUserProfileToStorage,
 } from '@/lib/profile/localProfile';
+import { resetLocalData } from '@/lib/profile/resetLocalData';
 import type { ConditionType, ActivityLevel } from '@/types/health.types';
 
 export default function ProfilePage() {
@@ -65,6 +66,24 @@ export default function ProfilePage() {
     });
 
     router.push('/plan');
+  };
+
+  const handleReset = () => {
+    if (
+      !window.confirm(
+        '프로필·건강기록·코스·보호자 데이터를 모두 삭제할까요?'
+      )
+    ) {
+      return;
+    }
+
+    resetLocalData();
+    setConditions([]);
+    setUserName('여행자');
+    setInsulinUser(false);
+    setActivityLevel('MEDIUM');
+    setRestrictions('');
+    router.push('/');
   };
 
   return (
@@ -139,6 +158,15 @@ export default function ProfilePage() {
 
       <Button type="submit" className="w-full" size="lg">
         시작하기
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full border-red-200 text-red-600 hover:bg-red-50"
+        onClick={handleReset}
+      >
+        데이터 초기화
       </Button>
     </form>
   );

@@ -15,6 +15,7 @@ interface HealthState {
   latestBloodSugar: number | null;
   addRecord: (record: Omit<HealthRecordEntry, 'id'>) => void;
   setLatestBloodSugar: (value: number) => void;
+  clearRecords: () => void;
 }
 
 export const useHealthStore = create<HealthState>()(
@@ -30,6 +31,7 @@ export const useHealthStore = create<HealthState>()(
           ].slice(0, 50),
         })),
       setLatestBloodSugar: (value) => set({ latestBloodSugar: value }),
+      clearRecords: () => set({ records: [], latestBloodSugar: null }),
     }),
     { name: 'travel-care-health' }
   )

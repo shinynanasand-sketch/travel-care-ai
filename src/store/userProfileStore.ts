@@ -10,6 +10,7 @@ interface UserProfileState {
   setName: (name: string) => void;
   setHealthProfile: (profile: HealthProfileInput) => void;
   hasCondition: (condition: ConditionType) => boolean;
+  reset: () => void;
 }
 
 export const useUserProfileStore = create<UserProfileState>()(
@@ -23,6 +24,12 @@ export const useUserProfileStore = create<UserProfileState>()(
       setHealthProfile: (profile) => set({ healthProfile: profile }),
       hasCondition: (condition) =>
         get().healthProfile?.conditions.includes(condition) ?? false,
+      reset: () =>
+        set({
+          userId: 'demo-user',
+          name: '여행자',
+          healthProfile: null,
+        }),
     }),
     { name: 'travel-care-profile' }
   )
