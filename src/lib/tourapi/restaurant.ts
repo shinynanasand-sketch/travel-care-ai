@@ -99,7 +99,8 @@ async function mapChunked<T, R>(
 async function veganStep1Keyword(
   lat: number,
   lng: number,
-  areaCode: string
+  areaCode: string,
+  sigunguCode?: string
 ): Promise<TourApiItem[]> {
   const results = await Promise.all(
     VEGAN_KEYWORDS.slice(0, 3).map(async (keyword) => {
@@ -109,7 +110,7 @@ async function veganStep1Keyword(
             ...getCommonParams(),
             keyword,
             contentTypeId: 39,
-            ...tourAreaFilterParams(areaCode),
+            ...tourAreaFilterParams(areaCode, sigunguCode),
             mapX: lng,
             mapY: lat,
             radius: WIDE_RADIUS,
@@ -185,18 +186,24 @@ async function veganStep3Detail(
 export async function getVeganRestaurants(
   lat: number,
   lng: number,
-  areaCode = '1'
+  areaCode = '1',
+  sigunguCode?: string
 ): Promise<TourApiItem[]> {
   if (!isTourApiConfigured()) {
     return getMockVeganRestaurants(areaCode, lat, lng);
   }
 
-  const cacheKey = buildCacheKey('vegan', 'pipeline', { lat, lng, areaCode });
+  const cacheKey = buildCacheKey('vegan', 'pipeline', {
+    lat,
+    lng,
+    areaCode,
+    sigunguCode: sigunguCode ?? '',
+  });
   const cached = await getCached<TourApiItem[]>(cacheKey);
   if (cached && cached.length > 0) return cached;
 
   try {
-    const step1 = await veganStep1Keyword(lat, lng, areaCode);
+    const step1 = await veganStep1Keyword(lat, lng, areaCode, sigunguCode);
 
     let step3: TourApiItem[] = [];
     try {

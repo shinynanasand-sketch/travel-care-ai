@@ -1,6 +1,6 @@
 import { addDays, format } from 'date-fns';
 import { getRegionByAreaCode } from '@/lib/data/korea-regions';
-import { getDestinationCoords } from '@/lib/data/korea-sigungu';
+import { getDestinationCoords, getSigungu } from '@/lib/data/korea-sigungu';
 import { tourCoords } from '@/lib/tourapi/client';
 import {
   getRestaurantsByLocation,
@@ -10,6 +10,7 @@ import {
 import { getMockRestaurants, getMockVeganRestaurants } from '@/lib/tourapi/mock-data';
 import { getAttractionsByArea, getAttractionsByLocation, getCulturalFacilitiesByArea } from '@/lib/tourapi/attraction';
 import { deduplicateByContentId } from '@/lib/tourapi/client';
+import { filterItemsBySigunguName } from '@/lib/tourapi/districtFilter';
 import { isRestaurantBlacklisted } from '@/lib/tourapi/restaurantBlacklist';
 import { filterPlacesWithImages, pickTourImageUrl } from '@/lib/tourapi/placeFilters';
 import { getWeather } from '@/lib/tourapi/weather';
@@ -201,6 +202,9 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   const sigunguCode = destination.sigunguCode?.trim() || undefined;
   const cityWide = !sigunguCode;
   const coords = getDestinationCoords(destination.areaCode, sigunguCode);
+  const sigunguName = sigunguCode
+    ? getSigungu(destination.areaCode, sigunguCode)?.name
+    : undefined;
   const isVegan = healthProfile.conditions.includes('VEGAN');
   const profileMode = getCourseProfileMode(healthProfile.conditions);
   const isHealthFocused = profileMode === 'health';
@@ -213,6 +217,7 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     destination: placeLabel,
     areaCode: destination.areaCode,
     sigunguCode: sigunguCode ?? '(시 전체)',
+    sigunguName: sigunguName ?? null,
     restaurantRadiusM,
     isVegan,
     travelStyle,
@@ -225,11 +230,10 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   };
 
   const [
-    restaurants,
-    veganRestaurants,
+    restaurantsRaw,
+    veganRestaurantsRaw,
     areaAttractions,
-    locationAttractions,
-    culturalFacilities,
+    culturalFacilitiesRaw,
     weather,
     hospitalResult,
     pharmacyResult,
@@ -242,15 +246,14 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
       destination.areaCode
     ),
     isVegan
-      ? getVeganRestaurants(coords.lat, coords.lng, destination.areaCode)
+      ? getVeganRestaurants(
+          coords.lat,
+          coords.lng,
+          destination.areaCode,
+          sigunguCode
+        )
       : Promise.resolve([]),
     getAttractionsByArea(destination.areaCode, sigunguCode),
-    getAttractionsByLocation(
-      coords.lat,
-      coords.lng,
-      cityWide && region.group === 'metropolitan' ? 12_000 : 8_000,
-      destination.areaCode
-    ),
     getCulturalFacilitiesByArea(destination.areaCode, sigunguCode),
     getWeather(destination.areaCode),
     isHealthFocused
@@ -262,20 +265,54 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     getWellnessCourse(coords.lat, coords.lng),
   ]);
 
+  // 구 모드: locationBased는 area 풀이 비었을 때만 (후필터 필수)
+  // 시 전체: 기존처럼 location 병합
+  let locationAttractions: Awaited<ReturnType<typeof getAttractionsByLocation>> =
+    [];
+  if (cityWide) {
+    locationAttractions = await getAttractionsByLocation(
+      coords.lat,
+      coords.lng,
+      region.group === 'metropolitan' ? 12_000 : 8_000,
+      destination.areaCode
+    );
+  } else if (areaAttractions.length === 0) {
+    const loc = await getAttractionsByLocation(
+      coords.lat,
+      coords.lng,
+      8_000,
+      destination.areaCode
+    );
+    locationAttractions = filterItemsBySigunguName(loc, sigunguName);
+  }
+
+  const restaurants = cityWide
+    ? restaurantsRaw
+    : filterItemsBySigunguName(restaurantsRaw, sigunguName);
+  const veganRestaurants = cityWide
+    ? veganRestaurantsRaw
+    : filterItemsBySigunguName(veganRestaurantsRaw, sigunguName);
+  const culturalFacilities = cityWide
+    ? culturalFacilitiesRaw
+    : filterItemsBySigunguName(culturalFacilitiesRaw, sigunguName);
+
   console.log('TourAPI 호출 완료', {
     restaurants: restaurants.length,
     attractions: areaAttractions.length + locationAttractions.length,
     cultural: culturalFacilities.length,
     wellness: wellnessItems.length,
+    cityWide,
   });
 
   const wellnessWithPhotos = filterPlacesWithImages(wellnessItems);
 
-  // Merge area + location pools (dedupe) — location is insurance for code migration
-  const attractions = deduplicateByContentId([
-    ...areaAttractions,
-    ...locationAttractions,
-  ]);
+  const attractions = deduplicateByContentId(
+    cityWide
+      ? [...areaAttractions, ...locationAttractions]
+      : areaAttractions.length > 0
+        ? filterItemsBySigunguName(areaAttractions, sigunguName)
+        : locationAttractions
+  );
 
   const attractionsWithPhotos = filterPlacesWithImages(attractions);
   console.log('명소 사진 필터', {
@@ -283,14 +320,14 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     after: attractionsWithPhotos.length,
   });
 
-  // 구 지정: 시·군 중심 40km / 시 전체(광역시): 시 중심 ~25km로 풀 정리
+  // 구 지정: 구 중심 ~6km / 시 전체(광역시): 시 중심 ~25km
   let scopedAttractions = attractionsWithPhotos;
   if (attractions.length > 0) {
     const maxM =
       cityWide && region.group === 'metropolitan'
         ? 25_000
         : !cityWide
-          ? 40_000
+          ? 6_000
           : undefined;
     if (maxM) {
       const near = scopedAttractions.filter((a) => {

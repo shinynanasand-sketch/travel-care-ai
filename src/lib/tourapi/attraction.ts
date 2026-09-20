@@ -41,21 +41,7 @@ export async function getAttractionsByArea(
     });
     let items = parseTourResponse<AttractionItem>(data);
 
-    // 시군 필터가 비면 시도(lDongRegn / area)만으로 재시도
-    if (items.length === 0 && sigunguCode) {
-      const wideParams = tourAreaFilterParams(areaCode, undefined);
-      const { data: wide } = await tourApiClient.get('/areaBasedList2', {
-        params: {
-          ...getCommonParams(),
-          ...wideParams,
-          contentTypeId: 12,
-          numOfRows: 40,
-          arrange: 'O',
-        },
-      });
-      items = parseTourResponse<AttractionItem>(wide);
-    }
-
+    // 구 지정 시 시 전체로 확대하지 않음 — 타 구 혼입·잘못된 캐시 방지
     if (items.length === 0) return [];
     await setCache(cacheKey, items, CACHE_TTL.areaBasedList);
     return items;
@@ -96,20 +82,7 @@ export async function getCulturalFacilitiesByArea(
     });
     let items = parseTourResponse<AttractionItem>(data);
 
-    if (items.length === 0 && sigunguCode) {
-      const wideParams = tourAreaFilterParams(areaCode, undefined);
-      const { data: wide } = await tourApiClient.get('/areaBasedList2', {
-        params: {
-          ...getCommonParams(),
-          ...wideParams,
-          contentTypeId: 14,
-          numOfRows: 30,
-          arrange: 'O',
-        },
-      });
-      items = parseTourResponse<AttractionItem>(wide);
-    }
-
+    // 구 지정 시 시 전체로 확대하지 않음
     if (items.length > 0) {
       await setCache(cacheKey, items, CACHE_TTL.areaBasedList);
     }

@@ -10,7 +10,9 @@ import {
   getVeganRestaurants,
 } from '@/lib/tourapi/restaurant';
 import { tourCoords } from '@/lib/tourapi/client';
+import { filterItemsBySigunguName } from '@/lib/tourapi/districtFilter';
 import { pickTourImageUrl } from '@/lib/tourapi/placeFilters';
+import { getSigungu } from '@/lib/data/korea-sigungu';
 import { errorResponse } from '@/lib/utils/api-error';
 import type { ConditionType } from '@/types/health.types';
 import type {
@@ -66,7 +68,8 @@ async function swapPlace(
   dayIndex: number,
   contentId: string,
   areaCode: string,
-  conditions: ConditionType[]
+  conditions: ConditionType[],
+  sigunguCode?: string
 ): Promise<DayCourse[]> {
   const day = days[dayIndex];
   if (!day) throw new Error('해당 일정이 없습니다.');
@@ -80,11 +83,17 @@ async function swapPlace(
   const exclude = usedContentIds(days, contentId);
   const { lat, lng } = current.coordinates;
   const isVegan = conditions.includes('VEGAN');
+  const sigunguName = sigunguCode
+    ? getSigungu(areaCode, sigunguCode)?.name
+    : undefined;
 
   let next: Schedule | null = null;
 
   if (current.type === 'ATTRACTION' || current.type === 'WELLNESS') {
-    const pool = await getAttractionsByLocation(lat, lng, 5000, areaCode);
+    let pool = await getAttractionsByLocation(lat, lng, 5000, areaCode);
+    if (sigunguName) {
+      pool = filterItemsBySigunguName(pool, sigunguName);
+    }
     const alt = pool.find((a) => !exclude.has(a.contentid));
     if (alt) {
       const c = tourCoords(alt.mapx, alt.mapy);
@@ -102,11 +111,14 @@ async function swapPlace(
     }
   } else if (current.type === 'RESTAURANT') {
     let pool = isVegan
-      ? await getVeganRestaurants(lat, lng, areaCode)
+      ? await getVeganRestaurants(lat, lng, areaCode, sigunguCode)
       : await getRestaurantsByLocation(lat, lng, 3000, areaCode, 30);
 
     if (isVegan && pool.length === 0) {
       pool = await getRestaurantsByLocation(lat, lng, 3000, areaCode, 30);
+    }
+    if (sigunguName) {
+      pool = filterItemsBySigunguName(pool, sigunguName);
     }
 
     const alt = pool.find((a) => !exclude.has(a.contentid));
@@ -201,7 +213,8 @@ export async function POST(request: Request) {
         dayIndex,
         body.contentId,
         genReq.destination.areaCode,
-        genReq.healthProfile?.conditions ?? []
+        genReq.healthProfile?.conditions ?? [],
+        genReq.destination.sigunguCode
       );
     } else {
       return Response.json({ error: '알 수 없는 action' }, { status: 400 });
