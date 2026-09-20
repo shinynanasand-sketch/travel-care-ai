@@ -59,6 +59,8 @@ export interface WeatherInfo {
   temperature: number;
   humidity: number;
   description: string;
+  /** stub = 실연동 전 고정값 */
+  source?: 'stub' | 'live';
 }
 
 export interface BarrierFreeItem {

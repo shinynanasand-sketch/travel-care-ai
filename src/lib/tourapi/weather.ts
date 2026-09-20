@@ -12,7 +12,8 @@ export async function getWeather(areaCode: string): Promise<WeatherInfo> {
     date: new Date().toISOString().split('T')[0],
     temperature: 22,
     humidity: 65,
-    description: '맑음',
+    description: '맑음 (참고용 고정값)',
+    source: 'stub',
   };
 
   await setCache(cacheKey, weather, CACHE_TTL.weather);

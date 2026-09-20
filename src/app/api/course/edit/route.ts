@@ -1,8 +1,18 @@
 import { generateOptimizedCourse } from '@/lib/ai/courseOptimizer';
+import {
+  analyzeMenuForHealth,
+  veganLevelFromAnalysis,
+} from '@/lib/ai/menuAnalyzer';
 import { getAttractionsByLocation } from '@/lib/tourapi/attraction';
-import { getRestaurantsByLocation } from '@/lib/tourapi/restaurant';
+import {
+  getRestaurantDetail,
+  getRestaurantsByLocation,
+  getVeganRestaurants,
+} from '@/lib/tourapi/restaurant';
 import { tourCoords } from '@/lib/tourapi/client';
+import { pickTourImageUrl } from '@/lib/tourapi/placeFilters';
 import { errorResponse } from '@/lib/utils/api-error';
+import type { ConditionType } from '@/types/health.types';
 import type {
   DayCourse,
   GenerateCourseRequest,
@@ -55,7 +65,8 @@ async function swapPlace(
   days: DayCourse[],
   dayIndex: number,
   contentId: string,
-  areaCode: string
+  areaCode: string,
+  conditions: ConditionType[]
 ): Promise<DayCourse[]> {
   const day = days[dayIndex];
   if (!day) throw new Error('해당 일정이 없습니다.');
@@ -68,6 +79,7 @@ async function swapPlace(
 
   const exclude = usedContentIds(days, contentId);
   const { lat, lng } = current.coordinates;
+  const isVegan = conditions.includes('VEGAN');
 
   let next: Schedule | null = null;
 
@@ -82,26 +94,63 @@ async function swapPlace(
         title: alt.title,
         address: alt.addr1,
         coordinates: c,
+        imageUrl: pickTourImageUrl(alt) ?? current.imageUrl,
         hookLine: `다른 선택 · 「${alt.title}」`,
         safetyReason: '일정에서 교체한 명소입니다.',
         accessibility: undefined,
       };
     }
   } else if (current.type === 'RESTAURANT') {
-    const pool = await getRestaurantsByLocation(lat, lng, 3000, areaCode, 30);
+    let pool = isVegan
+      ? await getVeganRestaurants(lat, lng, areaCode)
+      : await getRestaurantsByLocation(lat, lng, 3000, areaCode, 30);
+
+    if (isVegan && pool.length === 0) {
+      pool = await getRestaurantsByLocation(lat, lng, 3000, areaCode, 30);
+    }
+
     const alt = pool.find((a) => !exclude.has(a.contentid));
     if (alt) {
       const c = tourCoords(alt.mapx, alt.mapy);
+      const detail = await getRestaurantDetail(alt.contentid);
+      const analysis = await analyzeMenuForHealth({
+        firstmenu: detail?.firstmenu ?? alt.title,
+        treatmenu: detail?.treatmenu ?? '',
+        conditions,
+      });
+      const veganGuaranteed =
+        isVegan &&
+        Boolean(alt.veganLevel) &&
+        alt.veganLevel !== 'NOT_VEGAN' &&
+        alt.veganLevel !== 'CHECK_NEEDED';
+
+      const veganLevel =
+        alt.veganLevel ?? veganLevelFromAnalysis(analysis);
+      let isVeganGuaranteed = current.isVeganGuaranteed;
+      if (isVegan) {
+        if (veganGuaranteed || analysis.veganFriendly === true) {
+          isVeganGuaranteed = true;
+        } else if (analysis.veganFriendly === 'PARTIAL') {
+          isVeganGuaranteed = undefined;
+        } else {
+          isVeganGuaranteed = false;
+        }
+      }
+
       next = {
         ...current,
         contentId: alt.contentid,
         title: alt.title,
         address: alt.addr1,
         coordinates: c,
+        imageUrl: pickTourImageUrl(alt) ?? current.imageUrl,
         hookLine: `다른 식사 · 「${alt.title}」`,
-        safetyReason: '일정에서 교체한 식당입니다. 메뉴는 현장에서 확인해 주세요.',
-        menuAnalysis: undefined,
-        veganLevel: alt.veganLevel,
+        safetyReason:
+          analysis.recommendation ||
+          '일정에서 교체한 식당입니다. 메뉴는 현장에서 확인해 주세요.',
+        menuAnalysis: analysis,
+        veganLevel,
+        isVeganGuaranteed,
       };
     }
   }
@@ -151,7 +200,8 @@ export async function POST(request: Request) {
         days,
         dayIndex,
         body.contentId,
-        genReq.destination.areaCode
+        genReq.destination.areaCode,
+        genReq.healthProfile?.conditions ?? []
       );
     } else {
       return Response.json({ error: '알 수 없는 action' }, { status: 400 });

@@ -13,6 +13,7 @@ import { deduplicateByContentId } from '@/lib/tourapi/client';
 import { isRestaurantBlacklisted } from '@/lib/tourapi/restaurantBlacklist';
 import { filterPlacesWithImages, pickTourImageUrl } from '@/lib/tourapi/placeFilters';
 import { getWeather } from '@/lib/tourapi/weather';
+import { isTourApiConfigured } from '@/lib/data/korea-regions';
 import {
   getNearbyHospitalsWithMeta,
   getNearbyPharmaciesWithMeta,
@@ -334,7 +335,8 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
   console.log('식당 사진 필터', { count: restaurantPool.length });
 
   let generalRestaurantPool: TourApiItem[] = filterPlacesWithImages(restaurants);
-  if (generalRestaurantPool.length === 0) {
+  // 실연동(USE_MOCK_DATA=false)에서는 빈 풀을 mock으로 채우지 않음
+  if (generalRestaurantPool.length === 0 && !isTourApiConfigured()) {
     generalRestaurantPool = getMockRestaurants(
       destination.areaCode,
       coords.lat,
@@ -342,7 +344,7 @@ export async function generateOptimizedCourse(request: GenerateCourseRequest) {
     );
   }
 
-  if (restaurantPool.length === 0) {
+  if (restaurantPool.length === 0 && !isTourApiConfigured()) {
     restaurantPool = isVegan
       ? [
           ...getMockVeganRestaurants(destination.areaCode, coords.lat, coords.lng),

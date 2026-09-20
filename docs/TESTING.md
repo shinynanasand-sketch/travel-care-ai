@@ -9,7 +9,7 @@
 2. `/plan` → 서울, 2박 3일 선택 → "안전 코스 생성하기"
 3. `/plan/result` → 건강 신호등 확인, 의료시설 목록 확인
 
-## 시나리오 B — 저혈당 재조정
+## 시나리오 B — 저혈당·주변 시설 안내
 
 1. `/travel` → 혈당 **58** 입력 → **기록** 버튼 클릭
 2. 빨간 경고 배너 + **「주변 약국 보기」** 버튼 확인 (119가 아님)
@@ -47,7 +47,7 @@ http://localhost:3000
 | 시나리오 | 상태 | 비고 |
 |----------|------|------|
 | A 당뇨 코스 | mock API 스모크 PASS | `POST /api/course/generate` → days=3, medicalFacilities≥1, safetyScore 반환 |
-| B 저혈당 재조정 | mock API 스모크 PASS | `bloodSugar=58` → DANGER, fcmMode=mock, 인근 시설 반환. 실 FCM·UI 배너는 Firebase/브라우저 확인 필요 |
+| B 저혈당·주변 시설 | mock API 스모크 PASS | `bloodSugar=58` → DANGER, fcmMode=mock, 인근 시설 반환. 실 FCM·UI 배너는 Firebase/브라우저 확인 필요 |
 | C 비건+당뇨 | mock API 스모크 PASS | 부산+VEGAN → hasVeganOptions=true. 실 API·비건 필터 UI는 `USE_MOCK_DATA=false` + 키 필요 |
 
 > 브라우저 UI 클릭 플로우(`/profile`→`/plan`→`/plan/result`)는 수동 확인 권장. 위 PASS는 서버 API 기준입니다.

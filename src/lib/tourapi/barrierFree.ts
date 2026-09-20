@@ -71,7 +71,7 @@ export async function getAccessibilityInfo(
     );
     const items = parseTourResponse<DetailWithTourRaw>(data);
     const raw = items[0];
-    if (!raw) return getMockAccessibility(contentId);
+    if (!raw) return null;
 
     const base: Omit<AccessibilityInfo, 'level'> = {
       contentid: raw.contentid ?? contentId,
@@ -93,10 +93,11 @@ export async function getAccessibilityInfo(
     await setCache(cacheKey, info, CACHE_TTL.barrierFree);
     return info;
   } catch {
-    return getMockAccessibility(contentId);
+    return null;
   }
 }
 
+/** 로컬·mock 전용 — TourAPI 미설정일 때만 사용 */
 function getMockAccessibility(contentId: string): AccessibilityInfo {
   const base = {
     contentid: contentId,

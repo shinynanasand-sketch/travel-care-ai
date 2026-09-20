@@ -339,6 +339,10 @@ export default function PlanPage() {
       >
         {generate.isPending ? '코스 생성 중...' : '안전 코스 생성하기'}
       </Button>
+
+      <p className="text-center text-xs text-gray-400">
+        AI 분석은 참고용이며 의료 진단·처방이 아닙니다.
+      </p>
     </div>
   );
 }

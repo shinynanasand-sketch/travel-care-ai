@@ -56,11 +56,11 @@ export async function getAttractionsByArea(
       items = parseTourResponse<AttractionItem>(wide);
     }
 
-    if (items.length === 0) return getMockAttractions(areaCode);
+    if (items.length === 0) return [];
     await setCache(cacheKey, items, CACHE_TTL.areaBasedList);
     return items;
   } catch {
-    return getMockAttractions(areaCode);
+    return [];
   }
 }
 
@@ -152,10 +152,10 @@ export async function getAttractionsByLocation(
       },
     });
     const items = parseTourResponse<AttractionItem>(data);
-    if (items.length === 0) return getMockAttractions(areaCode);
+    if (items.length === 0) return [];
     await setCache(cacheKey, items, CACHE_TTL.areaBasedList);
     return items;
   } catch {
-    return getMockAttractions(areaCode);
+    return [];
   }
 }

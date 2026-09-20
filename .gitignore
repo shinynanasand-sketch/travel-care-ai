@@ -46,3 +46,12 @@ next-env.d.ts
 .idea/
 .vscode/
 *.swp
+
+# Incomplete local deploy artifacts (do not commit)
+.deploy-parts/
+.tmp-deploy-payload.json
+.tmp-vercel-redeploy.log
+.vercel-deploy-args.json
+.vercel-deploy-payload.json
+.vercel-mcp-deploy-args.json
+docs/screenshots/capture-log.txt

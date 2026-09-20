@@ -13,11 +13,13 @@ interface RestaurantCardProps {
   firstmenu?: string;
   hookLine?: string;
   imageUrl?: string;
+  contentId?: string;
   safetyLevel: Schedule['safetyLevel'];
   veganLevel?: Schedule['veganLevel'];
   isVeganGuaranteed?: Schedule['isVeganGuaranteed'];
   safetyReason: string;
   openTime?: string;
+  menuAnalysis?: Schedule['menuAnalysis'];
 }
 
 export function RestaurantCard({
@@ -26,14 +28,20 @@ export function RestaurantCard({
   firstmenu,
   hookLine,
   imageUrl,
+  contentId,
   safetyLevel,
   veganLevel,
   isVeganGuaranteed,
   safetyReason,
   openTime,
+  menuAnalysis,
 }: RestaurantCardProps) {
   const isRed = safetyLevel === 'RED';
   const [careOpen, setCareOpen] = useState(isRed);
+  const isSample = Boolean(contentId?.startsWith('mock-'));
+  const veganItems = menuAnalysis?.veganItems?.filter(Boolean).slice(0, 3) ?? [];
+  const nonVegan =
+    menuAnalysis?.nonVeganIngredients?.filter(Boolean).slice(0, 3) ?? [];
 
   return (
     <Card
@@ -46,7 +54,14 @@ export function RestaurantCard({
         className="h-44 w-full rounded-none rounded-t-lg"
       />
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">🍽️ {title}</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-base">🍽️ {title}</CardTitle>
+          {isSample && (
+            <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">
+              샘플
+            </span>
+          )}
+        </div>
         {isVeganGuaranteed === false && (
           <div className="mt-2 rounded-lg border-2 border-orange-400 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-900">
             ⚠️ 주변에 비건 식당이 없어 대안으로 안내합니다
@@ -65,6 +80,25 @@ export function RestaurantCard({
           <HealthLight level={safetyLevel} reason={isRed ? safetyReason : undefined} />
           {veganLevel && <VeganLight level={veganLevel} />}
         </div>
+        {(veganItems.length > 0 || nonVegan.length > 0 || menuAnalysis?.recommendation) && (
+          <div className="space-y-1 rounded-md bg-emerald-50/80 px-2 py-1.5 text-xs text-emerald-950">
+            {veganItems.length > 0 && (
+              <p>
+                <span className="font-semibold">추천 메뉴:</span>{' '}
+                {veganItems.join(', ')}
+              </p>
+            )}
+            {nonVegan.length > 0 && (
+              <p>
+                <span className="font-semibold">주의 재료:</span>{' '}
+                {nonVegan.join(', ')}
+              </p>
+            )}
+            {menuAnalysis?.recommendation && (
+              <p className="text-emerald-900/90">{menuAnalysis.recommendation}</p>
+            )}
+          </div>
+        )}
         {isRed && (
           <p className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-800">
             식이·건강상 주의: {safetyReason}

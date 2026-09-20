@@ -200,10 +200,12 @@ export function CourseCard({
                   firstmenu={schedule.menuAnalysis?.menuItems[0]?.name}
                   hookLine={schedule.hookLine}
                   imageUrl={schedule.imageUrl}
+                  contentId={schedule.contentId}
                   safetyLevel={schedule.safetyLevel}
                   veganLevel={schedule.veganLevel}
                   isVeganGuaranteed={schedule.isVeganGuaranteed}
                   safetyReason={schedule.safetyReason}
+                  menuAnalysis={schedule.menuAnalysis}
                 />
               )}
               {schedule.type === 'ATTRACTION' && (

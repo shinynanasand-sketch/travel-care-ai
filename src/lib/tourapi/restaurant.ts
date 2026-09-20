@@ -74,11 +74,11 @@ export async function getRestaurantsByLocation(
       },
     });
     const items = parseTourResponse<TourApiItem>(data);
-    if (items.length === 0) return getMockRestaurants(areaCode, lat, lng);
+    if (items.length === 0) return [];
     await setCache(cacheKey, items, CACHE_TTL.locationBased);
     return items;
   } catch {
-    return getMockRestaurants(areaCode, lat, lng);
+    return [];
   }
 }
 
@@ -207,11 +207,11 @@ export async function getVeganRestaurants(
     }
 
     const merged = deduplicateByContentId([...step1, ...step3]);
-    if (merged.length === 0) return getMockVeganRestaurants(areaCode, lat, lng);
+    if (merged.length === 0) return [];
     await setCache(cacheKey, merged, CACHE_TTL.veganSearch);
     return merged;
   } catch {
-    return getMockVeganRestaurants(areaCode, lat, lng);
+    return [];
   }
 }
 
@@ -243,6 +243,6 @@ export async function getRestaurantDetail(
     if (detail) await setCache(cacheKey, detail, CACHE_TTL.detailIntro);
     return detail;
   } catch {
-    return getMockRestaurantDetail(contentId);
+    return null;
   }
 }

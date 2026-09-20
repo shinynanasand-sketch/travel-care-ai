@@ -26,66 +26,56 @@ export default function TravelPage() {
   const [recordedMessage, setRecordedMessage] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [guardianToast, setGuardianToast] = useState(false);
+  const [guardianToast, setGuardianToast] = useState<string | null>(null);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [fcmSetupMessage, setFcmSetupMessage] = useState<string | null>(null);
+  const [hypoNearbyCta, setHypoNearbyCta] = useState(false);
   const guardianToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+
+  const showStatusToast = (message: string) => {
+    setGuardianToast(message);
+    if (guardianToastTimerRef.current) {
+      clearTimeout(guardianToastTimerRef.current);
+    }
+    guardianToastTimerRef.current = setTimeout(() => {
+      setGuardianToast(null);
+    }, 4000);
+  };
 
   useEffect(() => {
     let unsubscribeForeground: (() => void) | null = null;
     let cancelled = false;
 
     const setupFcm = async () => {
-      console.log(
-        '%c🚨 [FCM DEBUG] /travel 페이지 FCM 초기화 시작',
-        'background:#7c3aed;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
-      );
-
       const result = await requestFcmToken();
       if (cancelled) return;
 
       if (result.token) {
         setFcmToken(result.token);
-        setFcmSetupMessage('알림 권한이 허용되었습니다. 저혈당 시 기기 알림을 받을 수 있습니다.');
-        console.log(
-          '%c🚨 [FCM DEBUG] page.tsx — fcmToken state 저장 완료',
-          'background:#15803d;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          { tokenPreview: `${result.token.slice(0, 12)}…${result.token.slice(-8)}` }
+        setFcmSetupMessage(
+          '알림 권한이 허용되었습니다. 저혈당 시 기기 알림을 받을 수 있습니다.'
         );
       } else if (result.permission === 'denied') {
-        setFcmSetupMessage('알림 권한이 거부되어 FCM 토큰을 발급하지 못했습니다.');
-        console.error(
-          '%c🚨 [FCM DEBUG] page.tsx — 알림 권한 거부',
-          'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          result
+        setFcmSetupMessage(
+          '알림 권한이 거부되어 FCM 토큰을 발급하지 못했습니다.'
         );
       } else if (result.error === 'missing_vapid_key') {
-        setFcmSetupMessage('NEXT_PUBLIC_FIREBASE_VAPID_KEY가 설정되지 않았습니다.');
-        console.error(
-          '%c🚨 [FCM DEBUG] page.tsx — VAPID 키 누락',
-          'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          result
+        setFcmSetupMessage(
+          'NEXT_PUBLIC_FIREBASE_VAPID_KEY가 설정되지 않았습니다.'
         );
       } else if (result.error) {
         setFcmSetupMessage(`FCM 토큰 발급 실패: ${result.error}`);
-        console.error(
-          '%c🚨 [FCM DEBUG] page.tsx — 토큰 발급 실패',
-          'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          result
-        );
       }
 
       const unsubscribe = await subscribeForegroundMessages((payload) => {
         if (payload.title || payload.body) {
-          setGuardianToast(true);
-          if (guardianToastTimerRef.current) {
-            clearTimeout(guardianToastTimerRef.current);
-          }
-          guardianToastTimerRef.current = setTimeout(() => {
-            setGuardianToast(false);
-          }, 3000);
+          showStatusToast(
+            payload.body
+              ? `알림 수신: ${payload.body}`
+              : '기기에서 긴급 알림을 수신했습니다.'
+          );
         }
       });
       if (!cancelled) {
@@ -102,17 +92,8 @@ export default function TravelPage() {
         clearTimeout(guardianToastTimerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only FCM setup
   }, []);
-
-  const showGuardianAlertToast = () => {
-    setGuardianToast(true);
-    if (guardianToastTimerRef.current) {
-      clearTimeout(guardianToastTimerRef.current);
-    }
-    guardianToastTimerRef.current = setTimeout(() => {
-      setGuardianToast(false);
-    }, 3000);
-  };
 
   const medicalSummary = useMemo(
     () => buildMedicalSummary(name, healthProfile, latestBloodSugar),
@@ -121,56 +102,89 @@ export default function TravelPage() {
   const isHypoglycemiaAlert =
     latestBloodSugar !== null && latestBloodSugar < 70;
 
+  const loadGuardians = () => {
+    try {
+      return JSON.parse(localStorage.getItem('guardians') ?? '[]') as {
+        name?: string;
+        phone?: string;
+        fcmToken?: string;
+      }[];
+    } catch {
+      return [];
+    }
+  };
+
   const sendHypoglycemiaNotify = async (value: number) => {
     if (value >= 70) return;
 
-    showGuardianAlertToast();
+    const guardians = loadGuardians();
+    const guardianTokens = guardians
+      .map((g) => g.fcmToken?.trim())
+      .filter((t): t is string => Boolean(t));
+    const contactLines = guardians
+      .filter((g) => g.name && g.phone)
+      .map((g) => `${g.name} ${g.phone}`);
 
-    if (!fcmToken) {
-      console.error(
-        '%c🚨 [FCM DEBUG] /api/notify 호출 불가 — fcmToken 없음',
-        'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-        { bloodSugar: value }
-      );
+    const tokensToNotify =
+      guardianTokens.length > 0
+        ? guardianTokens
+        : fcmToken
+          ? [fcmToken]
+          : [];
+
+    if (tokensToNotify.length === 0) {
+      if (contactLines.length > 0) {
+        showStatusToast(
+          `푸시 미등록 — 보호자 연락: ${contactLines.slice(0, 2).join(', ')}`
+        );
+      } else {
+        showStatusToast(
+          '푸시·보호자 미등록 — 보호자 설정에서 연락처를 등록해 주세요.'
+        );
+      }
       return;
     }
 
-    console.log(
-      '%c🚨 [FCM DEBUG] /api/notify 호출 시작 (DB와 독립 실행)',
-      'background:#1d4ed8;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-      {
-        bloodSugar: value,
-        tokenPreview: `${fcmToken.slice(0, 12)}…${fcmToken.slice(-8)}`,
+    let anySent = false;
+    const usedGuardianToken = guardianTokens.length > 0;
+
+    for (const token of tokensToNotify) {
+      try {
+        const response = await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, bloodSugar: value }),
+        });
+        const data = (await response.json()) as {
+          sent?: boolean;
+          mode?: string;
+        };
+        if (response.ok && data.sent === true) {
+          anySent = true;
+        } else {
+          console.error('[travel] /api/notify 실패 또는 스킵', {
+            status: response.status,
+            ...data,
+          });
+        }
+      } catch (error) {
+        console.error('[travel] /api/notify 예외', error);
       }
-    );
+    }
 
-    try {
-      const response = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: fcmToken, bloodSugar: value }),
-      });
-
-      const data = (await response.json()) as Record<string, unknown>;
-
-      if (response.ok && data.sent === true) {
-        console.log(
-          '%c🚨 [FCM DEBUG] /api/notify ✅ 성공',
-          'background:#15803d;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          { status: response.status, ...data }
-        );
-      } else {
-        console.error(
-          '%c🚨 [FCM DEBUG] /api/notify ❌ 실패 또는 스킵',
-          'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-          { status: response.status, ...data }
-        );
-      }
-    } catch (error) {
-      console.error(
-        '%c🚨 [FCM DEBUG] /api/notify ❌ 네트워크/파싱 예외',
-        'background:#b91c1c;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;',
-        error
+    if (anySent) {
+      showStatusToast(
+        usedGuardianToken
+          ? '등록된 보호자 기기로 긴급 알림을 전송했습니다.'
+          : '이 기기로 긴급 알림을 전송했습니다. (보호자 푸시 미등록)'
+      );
+    } else if (contactLines.length > 0) {
+      showStatusToast(
+        `푸시 전송 실패 — 보호자 연락: ${contactLines.slice(0, 2).join(', ')}`
+      );
+    } else {
+      showStatusToast(
+        '긴급 알림 전송에 실패했습니다. 알림 권한·설정을 확인해 주세요.'
       );
     }
   };
@@ -240,6 +254,7 @@ export default function TravelPage() {
     const result = recordBloodSugar(value);
     setRecordedMessage(`혈당 ${value} mg/dL 기록되었습니다.`);
     setInputKey((k) => k + 1);
+    setHypoNearbyCta(value < 70);
 
     // FCM 알림과 DB 저장을 완전히 독립 실행 — DB 실패/지연이 FCM을 막지 않음
     await Promise.allSettled([
@@ -258,7 +273,7 @@ export default function TravelPage() {
           aria-live="polite"
           className="fixed bottom-20 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-lg bg-emerald-700 px-4 py-3 text-center text-sm font-medium text-white shadow-lg"
         >
-          ✓ 등록된 보호자에게 긴급 알림을 전송했습니다.
+          {guardianToast}
         </div>
       )}
 
@@ -281,6 +296,23 @@ export default function TravelPage() {
             isHypoglycemiaAlert ? () => setSummaryOpen(true) : undefined
           }
         />
+      )}
+
+      {(hypoNearbyCta || isHypoglycemiaAlert) && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="space-y-3 p-4">
+            <p className="text-sm font-medium text-red-900">
+              저혈당 주의 — 일정을 바꾸기보다 가까운 약국·병원에서 당 보충과
+              도움을 받으세요. (참고용 안내)
+            </p>
+            <Button
+              className="w-full"
+              onClick={() => router.push('/travel/nearby')}
+            >
+              주변 약국·병원 보기
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       <MedicalSummaryModal

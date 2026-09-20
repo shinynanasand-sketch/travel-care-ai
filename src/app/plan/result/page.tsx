@@ -118,6 +118,9 @@ export default function PlanResultPage() {
         <p className="mt-3 text-xs text-emerald-50/90">
           장소를 바꾸거나 하루만 다시 뽑을 수 있습니다.
         </p>
+        <p className="mt-2 text-xs text-emerald-50/80">
+          AI 분석·비건 신호등은 참고용이며 의료 진단·처방이 아닙니다.
+        </p>
       </div>
 
       <MedicalDiagnosticsBanner
@@ -189,6 +192,10 @@ export default function PlanResultPage() {
       <Button className="w-full" onClick={() => router.push('/travel')}>
         여행 시작하기
       </Button>
+
+      <p className="text-center text-xs text-gray-400">
+        AI 분석은 참고용이며 의료 진단·처방이 아닙니다.
+      </p>
     </div>
   );
 }

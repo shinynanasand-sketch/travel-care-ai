@@ -1,7 +1,7 @@
 # 공모전 제출 준비 체크리스트
 
 마감: **2026-09-28** · 부문: 관광데이터 활용 공모전 ②-2 웹·앱  
-문서 갱신: **2026-08-28**
+문서 갱신: **2026-09-17**
 
 ## 공개 URL
 
@@ -10,7 +10,7 @@
 | GitHub | https://github.com/shinynanasand-sketch/travel-care-ai | 준비됨 |
 | Vercel | https://travel-care-ai.vercel.app | 준비됨 |
 
-## 현재 연동 상태 (2026-08-28)
+## 현재 연동 상태 (2026-09-17)
 
 | 항목 | 상태 |
 |------|------|
@@ -22,7 +22,7 @@
 | 코스 API maxDuration | 60초 (vercel.json + route export) |
 | 의료 진단 배너 | 기본 숨김 (`NEXT_PUBLIC_SHOW_MEDICAL_DIAGNOSTICS=true` 시만 표시) |
 | 법정동 필터 (lDong*) | 광역시 맵 + areaBased/searchKeyword grace 병행 |
-| Firebase FCM | 미설정(선택) |
+| Firebase FCM | 배포·Admin/Client env 설정됨 (`/api/notify` `configured:true`, SW 200). 실기기 토큰으로 푸시 검증 권장 |
 | Supabase DB | placeholder(선택) |
 
 ## TourAPI 활용 내역 (제출 복붙용)
@@ -99,7 +99,10 @@ npm run test:demo-preflight  # 촬영 전 점검
 - [ ] 기능설명서 PPT 양식에 문구·이미지 반영 후 제출
 - [ ] https://api.visitkorea.or.kr 제출 완료
 
-## FCM 블로커 (선택 · 마감 후 가능)
+## FCM 상태 (2026-09-17)
 
-`FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`  
-준비 후 `/guardian` + 저혈당 시나리오 검증.
+- 프로덕션에 `/api/notify`, `/firebase-messaging-sw.js`, `/firebase-sw-config.js` 배포됨
+- Vercel Production에 Admin(`FIREBASE_*`)·Client(`NEXT_PUBLIC_FIREBASE_*`·VAPID) env 반영
+- API 스모크: 잘못된 토큰 → `configured:true` + `messaging/invalid-argument` (SDK 연동 확인)
+- 남은 검증: 브라우저 `/travel`에서 알림 허용 → 혈당 70 미만 → 실제 푸시 수신
+- GitHub↔Vercel 자동 배포는 GitHub App 미설치로 끊김 → 당분간 `npx vercel deploy --prod --scope nanasands-projects` 또는 [Vercel GitHub App](https://github.com/apps/vercel) 설치 후 `vercel git connect`
